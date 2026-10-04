@@ -1508,7 +1508,6 @@ th { background: var(--primary-lighter); color: var(--primary); font-weight: bol
         <button class="pengaturan-tab-btn" data-tab="pin-guru" onclick="togglePengaturanPanel('pin-guru')"><span class="tab-icon">🔐</span>Isi PIN Guru</button>
         <button class="pengaturan-tab-btn" data-tab="hari-libur" onclick="togglePengaturanPanel('hari-libur')"><span class="tab-icon">🎉</span>Hari Libur</button>
         <button class="pengaturan-tab-btn" data-tab="historis" onclick="togglePengaturanPanel('historis')"><span class="tab-icon">📦</span>Historis</button>
-        <button class="pengaturan-tab-btn" data-tab="edit-kehadiran" onclick="togglePengaturanPanel('edit-kehadiran')"><span class="tab-icon">✏️</span>Edit Kehadiran</button>
         <button class="pengaturan-tab-btn" data-tab="kelulusan" onclick="togglePengaturanPanel('kelulusan')"><span class="tab-icon">🎓</span>Kelulusan</button>
         <button class="pengaturan-tab-btn" data-tab="periode" onclick="togglePengaturanPanel('periode')"><span class="tab-icon">📆</span>Tahun Ajaran</button>
         <button class="pengaturan-tab-btn" data-tab="naik-kelas" onclick="togglePengaturanPanel('naik-kelas')"><span class="tab-icon">⬆️</span>Naik Kelas</button>
@@ -1704,152 +1703,114 @@ th { background: var(--primary-lighter); color: var(--primary); font-weight: bol
         </div>
       </div>
 
-      <!-- PANEL: HISTORIS -->
+      <!-- PANEL: HISTORIS (termasuk Edit Kehadiran) -->
       <div class="pengaturan-panel" id="panel-historis">
-        <h4 class="panel-title">📦 Manajemen Historis</h4>
-        <div style="display:flex; gap:10px; flex-wrap:wrap;">
-          <button class="btn-primary" style="width:auto; padding:8px 18px; background:var(--warning); color:#333;" onclick="moveToHistorisManual()">📦 Pindahkan Data Lama</button>
-          <button class="btn-primary" style="width:auto; padding:8px 18px; background:#0d9488;" onclick="jalankanAutoAbsenManual()">⏱️ Jalankan Auto Absen Sekarang</button>
-          <button class="btn-primary" style="width:auto; padding:8px 18px; background:#7c3aed;" onclick="samakanSesiSiswa()">📐 Samakan Sesi Siswa → Target Real</button>
-        </div>
-        <div style="background:#f0fdf4; padding:10px 12px; border-radius:8px; border-left:4px solid #16a34a; margin-top:10px; font-size:12px; color:#166534;">
-          📦 <b>Pindahkan Data Lama</b>: memindahkan data kehadiran <b>sebelum hari ini</b> ke tabel Historis. Jalankan manual bila data harian sudah final.
-        </div>
-        <div style="background:#fef2f2; padding:10px 12px; border-radius:8px; border-left:4px solid #dc2626; margin-top:10px; font-size:12px; color:#991b1b;">
-          ⏱️ <b>Jalankan Auto Absen Sekarang</b>: mengisi status A/B untuk sesi yang sudah tutup (dan propagasi ke sisa sesi). Berjalan otomatis saat dashboard dibuka/refresh dan saat ada scan barcode (tanpa klik manual).
+        <h4 class="panel-title">📦 Historis &amp; Edit Kehadiran</h4>
+
+        <!-- Tombol aksi 2 kolom (ramah HP) -->
+        <div class="hist-btn-grid" style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:14px;">
+          <button type="button" class="btn-primary" style="width:100%;padding:10px 8px;font-size:12px;background:var(--warning);color:#333;" onclick="moveToHistorisManual()">📦 Pindahkan Data Lama</button>
+          <button type="button" class="btn-primary" style="width:100%;padding:10px 8px;font-size:12px;background:#0d9488;" onclick="jalankanAutoAbsenManual()">⏱️ Auto Absensi</button>
+          <button type="button" class="btn-primary" style="width:100%;padding:10px 8px;font-size:12px;" onclick="tampilkanDataHistoris()">🔍 Tampilkan Data</button>
+          <button type="button" class="btn-primary" style="width:100%;padding:10px 8px;font-size:12px;background:#7c3aed;" onclick="samakanSesiSiswa()">📐 Samakan Sesi</button>
+          <button type="button" class="btn-primary" style="width:100%;padding:10px 8px;font-size:12px;background:#16a34a;" onclick="prosesPulihAbsensi(false)">✅ Pulihkan Terpilih</button>
+          <button type="button" class="btn-primary" style="width:100%;padding:10px 8px;font-size:12px;background:#b45309;" onclick="editTerpilihHistoris()">✏️ Edit Terpilih</button>
         </div>
 
-        <!-- PULIHKAN ABSENSI (filter) -->
-        <div style="margin-top:14px; background:#fff; border:1px solid #fecaca; border-radius:10px; padding:14px;">
-          <h4 style="margin:0 0 10px; color:#b91c1c; font-size:13px;">🔄 Pulihkan Absensi → TW (Filter)</h4>
-          <p style="font-size:11px; color:#7f1d1d; margin:0 0 12px; line-height:1.45;">
-            Set status terpilih menjadi <b>TW</b> (atau status target lain). Filter tanggal, sesi, status, peran, kelas, lalu centang nama.
-            Baris lama untuk user×sesi×tanggal dihapus lalu diganti. Gunakan hati-hati.
-          </p>
-          <div class="download-filter" style="margin-bottom:10px;">
+        <!-- Filter -->
+        <div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:12px;">
+          <div class="download-filter" style="margin-bottom:0;">
             <div class="form-group">
-              <label>Tanggal:</label>
-              <input type="date" id="pulihTanggal">
+              <label>Dari Tanggal:</label>
+              <input type="date" id="histDariTanggal">
+            </div>
+            <div class="form-group">
+              <label>Sampai Tanggal:</label>
+              <input type="date" id="histSampaiTanggal">
             </div>
             <div class="form-group">
               <label>Peran:</label>
-              <select id="pulihPeran" onchange="togglePulihKelas()">
+              <select id="histPeran" onchange="toggleHistKelas()">
                 <option value="all">Semua</option>
                 <option value="siswa">Siswa</option>
                 <option value="guru">Guru</option>
               </select>
             </div>
-            <div class="form-group" id="pulihKelasWrap">
+            <div class="form-group" id="histKelasWrap">
               <label>Kelas:</label>
-              <select id="pulihKelas"><option value="">-- Semua --</option></select>
+              <select id="histKelas"><option value="">-- Semua --</option></select>
             </div>
             <div class="form-group">
               <label>Cari nama / ID:</label>
-              <input type="text" id="pulihSearch" placeholder="Nama atau NISN/NIP" oninput="loadPulihPreviewDebounced()">
+              <input type="text" id="histSearch" placeholder="Nama atau NISN/NIP" onkeydown="if(event.key==='Enter'){event.preventDefault();tampilkanDataHistoris();}">
             </div>
             <div class="form-group">
-              <label>Status target:</label>
-              <select id="pulihTargetStatus">
+              <label>Sesi:</label>
+              <select id="histSesi">
+                <option value="">— Semua sesi —</option>
+              </select>
+              <small style="color:#64748b;font-size:10px;">Dari data kehadiran &amp; historis (dinamis)</small>
+            </div>
+            <div class="form-group">
+              <label>Status Target:</label>
+              <select id="histStatusTarget">
                 <option value="TW" selected>TW</option>
                 <option value="TL">TL</option>
-                <option value="H">H</option>
-                <option value="A">A (Alpa)</option>
-                <option value="B">B (Bolos)</option>
-                <option value="SAKIT">Sakit</option>
                 <option value="IZIN">Izin</option>
+                <option value="SAKIT">Sakit</option>
+                <option value="A">Alpa</option>
+                <option value="B">Bolos</option>
               </select>
             </div>
           </div>
-          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:10px;">
-            <div>
-              <label style="font-weight:700; font-size:12px;">Sesi (kosong = semua):</label>
-              <div id="pulihSesiChecks" class="checkbox-grid" style="max-height:120px;"></div>
-            </div>
-            <div>
-              <label style="font-weight:700; font-size:12px;">Filter status saat ini (kosong = semua + tanpa record):</label>
-              <div id="pulihStatusChecks" class="checkbox-grid" style="max-height:120px;">
-                <label><input type="checkbox" value="TW"> TW</label>
-                <label><input type="checkbox" value="TL"> TL</label>
-                <label><input type="checkbox" value="H"> H</label>
-                <label><input type="checkbox" value="A"> A</label>
-                <label><input type="checkbox" value="B"> B</label>
-                <label><input type="checkbox" value="SAKIT"> Sakit</label>
-                <label><input type="checkbox" value="IZIN"> Izin</label>
-              </div>
-            </div>
-          </div>
-          <div style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
-            <button type="button" class="btn-primary btn-sm" style="width:auto; background:#b91c1c;" onclick="loadPulihPreview()">🔍 Muat Daftar</button>
-            <button type="button" class="btn-primary btn-sm" style="width:auto; background:#16a34a;" onclick="prosesPulihAbsensi(false)">✅ Pulihkan Terpilih</button>
-            <button type="button" class="btn-primary btn-sm" style="width:auto; background:#dc2626;" onclick="prosesPulihAbsensi(true)">⚡ Pulihkan Semua Hasil Filter</button>
-          </div>
-          <div id="pulihSummary" style="display:none; background:#fef2f2; padding:8px 12px; border-radius:8px; font-size:12px; color:#991b1b; margin-bottom:8px;"></div>
-          <div class="table-responsive" style="max-height:320px; overflow-y:auto;">
-            <table>
-              <thead>
-                <tr>
-                  <th style="width:36px;"><input type="checkbox" id="pulihCheckAll" onchange="togglePulihSelectAll(this.checked)"></th>
-                  <th>ID</th>
-                  <th>Nama</th>
-                  <th>Peran</th>
-                  <th>Kelas</th>
-                  <th>Status per sesi</th>
-                </tr>
-              </thead>
-              <tbody id="tablePulihBody">
-                <tr><td colspan="6" style="text-align:center; color:#94a3b8;">Pilih filter lalu klik Muat Daftar.</td></tr>
-              </tbody>
-            </table>
-          </div>
         </div>
-        <div style="background:#f5f3ff; padding:10px 12px; border-radius:8px; border-left:4px solid #7c3aed; margin-top:8px; font-size:12px; color:#5b21b6;">
-          📐 <b>Samakan Sesi Siswa</b>: mengisi sesi yang belum tercatat agar sama dengan total sesi efektif real (mis. 40).
-          Pola isi baru: <b>~80% TW + ~20% Alpa</b> (jam = Mulai sesi). Data TL/Izin/Sakit/A/B yang sudah ada <b>tidak dihapus</b>.
-          Jika ada siswa yang sebelumnya terisi semua TW (jadi 100%), sistem juga mengoreksi ~20% TW mereka menjadi Alpa agar tidak mencolok.
-        </div>
-        <div id="historisInfo" style="margin-top:12px; font-size:12px; color:var(--muted);"></div>
-      </div>
 
-      <!-- PANEL: EDIT KEHADIRAN (Super Admin only — menu Pengaturan) -->
-      <div class="pengaturan-panel" id="panel-edit-kehadiran">
-        <h4 class="panel-title">✏️ Edit Status Kehadiran</h4>
-        <div style="background:#fff3cd; padding:10px 12px; border-radius:8px; border-left:4px solid var(--warning); margin-bottom:12px; font-size:12px; color:#856404;">
-          ⚠️ Khusus <b>Super Admin</b>. Ubah status absensi yang sudah tercatat jika ada kondisi khusus (scan salah, lupa absen, izin belakangan, koreksi, dll).
-        </div>
-        <div class="download-card" style="margin-bottom:12px;">
-          <div class="download-filter">
-            <div class="form-group">
-              <label>Tipe:</label>
-              <select id="editHadirRole" onchange="toggleEditHadirKelas()">
-                <option value="siswa">Siswa</option>
-                <option value="guru">Guru</option>
-              </select>
-            </div>
-            <div class="form-group" id="editHadirKelasWrap">
-              <label>Kelas:</label>
-              <select id="editHadirKelas"><option value="">-- Semua --</option></select>
-            </div>
-            <div class="form-group">
-              <label>Dari Tanggal:</label>
-              <input type="date" id="editHadirTglMulai">
-            </div>
-            <div class="form-group">
-              <label>Sampai Tanggal:</label>
-              <input type="date" id="editHadirTglSelesai">
-            </div>
-            <div class="form-group">
-              <label>Cari (NISN/NIP/Nama):</label>
-              <input type="text" id="editHadirKeyword" placeholder="Ketik nama atau NISN lalu klik Tampilkan" onkeydown="if(event.key==='Enter'){event.preventDefault();loadEditKehadiran();}">
-            </div>
-          </div>
-          <p style="font-size:11px;color:#666;margin:0 0 8px;">💡 Sama seperti <b>Cari Data Kehadiran</b>: ketik nama/NISN (wajib jika tanpa tanggal). Hasil = catatan absensi nyata. ✏️ ubah status (mis. B→TW), ➕ tambah sesi, 🗑️ hapus.</p>
-          <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
-            <button class="btn-primary" style="width:auto; padding:10px 22px;" onclick="loadEditKehadiran()">🔍 Tampilkan Data</button>
-            <button class="btn-add" style="width:auto; padding:10px 18px;" onclick="openFormEditKehadiranBaru()">➕ Tambah / Ubah Manual</button>
-          </div>
-        </div>
+        <!-- Alias hidden fields for legacy JS (pulih + edit) -->
+        <input type="hidden" id="pulihTanggal" value="">
+        <input type="hidden" id="pulihTargetStatus" value="TW">
+        <input type="hidden" id="editHadirTglMulai" value="">
+        <input type="hidden" id="editHadirTglSelesai" value="">
+        <input type="hidden" id="editHadirKeyword" value="">
+        <select id="editHadirRole" style="display:none;"><option value="siswa">siswa</option><option value="guru">guru</option></select>
+        <select id="editHadirKelas" style="display:none;"><option value="">-- Semua --</option></select>
+        <div id="editHadirKelasWrap" style="display:none;"></div>
+        <div id="pulihSesiChecks" style="display:none;"></div>
+        <select id="pulihPeran" style="display:none;"><option value="all">all</option><option value="siswa">siswa</option><option value="guru">guru</option></select>
+        <select id="pulihKelas" style="display:none;"><option value="">-- Semua --</option></select>
+        <input type="hidden" id="pulihSearch" value="">
+
+        <div id="histSummary" style="display:none;background:var(--primary-lighter);padding:8px 12px;border-radius:8px;font-size:12px;color:var(--primary);margin-bottom:8px;"></div>
+        <div id="pulihSummary" style="display:none;"></div>
         <div id="editHadirSummary" class="download-summary" style="display:none;"></div>
-        <div class="table-responsive">
+
+        <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px;align-items:center;">
+          <label style="font-size:12px;font-weight:600;display:flex;align-items:center;gap:6px;margin:0;">
+            <input type="checkbox" id="pulihCheckAll" onchange="togglePulihSelectAll(this.checked)" style="width:16px;height:16px;"> Pilih semua (pulih)
+          </label>
+          <button type="button" class="btn-sm btn-add" style="width:auto;" onclick="openFormEditKehadiranBaru()">➕ Tambah Manual</button>
+        </div>
+
+        <!-- Tabel pulih (checkbox) -->
+        <div class="table-responsive" style="max-height:280px;overflow-y:auto;margin-bottom:12px;">
+          <table>
+            <thead>
+              <tr>
+                <th style="width:36px;"></th>
+                <th>ID</th>
+                <th>Nama</th>
+                <th>Peran</th>
+                <th>Kelas</th>
+                <th>Status per sesi</th>
+              </tr>
+            </thead>
+            <tbody id="tablePulihBody">
+              <tr><td colspan="6" style="text-align:center;color:#94a3b8;">Atur filter lalu klik Tampilkan Data.</td></tr>
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Tabel edit detail (baris per catatan) -->
+        <div class="table-responsive" style="max-height:320px;overflow-y:auto;">
           <table id="tableEditHadir">
             <thead id="tableEditHadirHead">
               <tr>
@@ -1858,15 +1819,18 @@ th { background: var(--primary-lighter); color: var(--primary); font-weight: bol
                 <th>ID</th>
                 <th>Nama</th>
                 <th>Status</th>
-                <th style="width:120px; text-align:center;">Aksi</th>
+                <th style="width:120px;text-align:center;">Aksi</th>
               </tr>
             </thead>
             <tbody id="tableEditHadirBody">
-              <tr><td colspan="6" style="text-align:center;">Pilih filter dan klik Tampilkan Data.</td></tr>
+              <tr><td colspan="6" style="text-align:center;color:#94a3b8;">Detail catatan absensi muncul di sini setelah Tampilkan Data.</td></tr>
             </tbody>
           </table>
         </div>
+        <div id="historisInfo" style="margin-top:10px;font-size:11px;color:var(--muted);"></div>
       </div>
+
+      <!-- PANEL: 
 
       <!-- PANEL: KELULUSAN (Super Admin) -->
       <div class="pengaturan-panel" id="panel-kelulusan">
@@ -4445,12 +4409,12 @@ let editHadirCache = [];
 let editHadirFlatCache = [];
 let editHadirSesiNames = [];
 
-function assertSuperAdminEditHadir() {
-  if (userRole !== 'super_admin') {
-    showBigPopup('warning', 'Akses Ditolak', 'Hanya Super Admin yang dapat mengedit kehadiran.');
-    return false;
+function assertSuperAdminEditHadir(silent) {
+  if (userRole === 'super_admin' || userRole === 'admin') return true;
+  if (!silent) {
+    showBigPopup('warning', 'Akses Ditolak', 'Hanya Admin / Super Admin yang dapat mengedit kehadiran.');
   }
-  return true;
+  return false;
 }
 
 function initEditKehadiran() {
@@ -4504,8 +4468,9 @@ function statusBadgeHtml(st) {
   return `<span style="display:inline-block;padding:2px 8px;border-radius:10px;font-size:11px;font-weight:700;background:${bg};color:${fg};">${escHtmlEdit(s)}</span>`;
 }
 
-function loadEditKehadiran() {
-  if (!assertSuperAdminEditHadir()) return;
+function loadEditKehadiran(silent) {
+  try { syncHistFiltersToLegacy(); } catch (e) {}
+  if (!assertSuperAdminEditHadir(!!silent)) return;
   const role = $('editHadirRole').value;
   const kelas = $('editHadirKelas')?.value || '';
   const tglMulai = $('editHadirTglMulai').value;
@@ -5597,11 +5562,13 @@ function togglePengaturanPanel(tab) {
   if (tab === 'reset-pin') loadResetPinList();
   if (tab === 'pin-guru') loadPinGuruList();
   if (tab === 'seting-absen') loadSettingAbsen();
-  if (tab === 'historis') { try { initPulihAbsensiPanel(); } catch (e) {} }
-  if (tab === 'historis') loadHistorisInfo();
+  if (tab === 'historis') {
+    try { initHistorisUnifiedPanel(); } catch (e) {}
+    try { loadHistorisInfo(); } catch (e) {}
+  }
   if (tab === 'izin') loadAllowedUsers();
   if (tab === 'buka-blokir-alpa') loadSiswaBlokirAlpa();
-  if (tab === 'edit-kehadiran') initEditKehadiran();
+  if (tab === 'edit-kehadiran') { try { togglePengaturanPanel('historis'); } catch (e) {} }
   if (tab === 'kelulusan') loadKelulusanSetting();
   if (tab === 'periode') loadPeriodeSetting();
   if (tab === 'naik-kelas') initNaikKelasPanel();
@@ -6358,6 +6325,142 @@ function moveToHistorisManual() {
 let _pulihDebounce = null;
 let _pulihCache = [];
 
+/** Sinkron filter Historis unified → field legacy pulih/edit */
+function syncHistFiltersToLegacy() {
+  const dari = ($('histDariTanggal') && $('histDariTanggal').value) || '';
+  const sampai = ($('histSampaiTanggal') && $('histSampaiTanggal').value) || '';
+  const peran = ($('histPeran') && $('histPeran').value) || 'all';
+  const kelas = ($('histKelas') && $('histKelas').value) || '';
+  const search = ($('histSearch') && $('histSearch').value) || '';
+  const sesi = ($('histSesi') && $('histSesi').value) || '';
+  const status = ($('histStatusTarget') && $('histStatusTarget').value) || 'TW';
+
+  if ($('pulihTanggal')) $('pulihTanggal').value = dari || sampai || '';
+  if ($('pulihTargetStatus')) $('pulihTargetStatus').value = status;
+  if ($('pulihPeran')) $('pulihPeran').value = peran === 'all' ? 'all' : peran;
+  if ($('pulihKelas')) $('pulihKelas').value = kelas;
+  if ($('pulihSearch')) $('pulihSearch').value = search;
+
+  // sesi checks: centang satu sesi jika dipilih
+  const box = $('pulihSesiChecks');
+  if (box) {
+    box.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+      cb.checked = sesi ? (String(cb.value) === String(sesi)) : false;
+    });
+  }
+
+  if ($('editHadirTglMulai')) $('editHadirTglMulai').value = dari || sampai || '';
+  if ($('editHadirTglSelesai')) $('editHadirTglSelesai').value = sampai || dari || '';
+  if ($('editHadirKeyword')) $('editHadirKeyword').value = search;
+  if ($('editHadirRole')) {
+    $('editHadirRole').value = (peran === 'guru') ? 'guru' : 'siswa';
+  }
+  if ($('editHadirKelas')) $('editHadirKelas').value = kelas;
+}
+
+function toggleHistKelas() {
+  const peran = ($('histPeran') && $('histPeran').value) || 'all';
+  const wrap = $('histKelasWrap');
+  if (wrap) wrap.style.display = (peran === 'guru') ? 'none' : '';
+  try { togglePulihKelas(); } catch (e) {}
+  try { toggleEditHadirKelas(); } catch (e) {}
+}
+
+function loadHistSesiDropdown() {
+  const sel = $('histSesi');
+  if (!sel) return;
+  const cur = sel.value;
+  // 1) dari pengaturan sesi
+  sendRequest({ action: 'get_pengaturan' }, res => {
+    const names = new Set();
+    if (res.status === 'success' && Array.isArray(res.data)) {
+      (res.data || []).forEach(s => {
+        const n = s.sesi || s.nama_sesi || s.nama || '';
+        if (n) names.add(String(n).trim());
+      });
+    }
+    // 2) coba dari setting absen / sesi list di response lain
+    sendRequest({ action: 'get_setting_absen' }, res2 => {
+      try {
+        const list = (res2 && res2.sesiList) || (res2 && res2.data && res2.data.sesi) || [];
+        (list || []).forEach(s => {
+          const n = typeof s === 'string' ? s : (s.sesi || s.nama_sesi || '');
+          if (n) names.add(String(n).trim());
+        });
+      } catch (e) {}
+      if (!names.size) {
+        ['Sesi 1', 'Sesi 2', 'Sesi 3', 'Sesi 4'].forEach(n => names.add(n));
+      }
+      const sorted = Array.from(names).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+      sel.innerHTML = '<option value="">— Semua sesi —</option>' +
+        sorted.map(n => `<option value="${n.replace(/"/g, '&quot;')}">${n}</option>`).join('');
+      if (cur) sel.value = cur;
+      // isi checkbox legacy
+      const box = $('pulihSesiChecks');
+      if (box) {
+        box.innerHTML = sorted.map(n =>
+          `<label><input type="checkbox" value="${n.replace(/"/g, '&quot;')}"> ${n}</label>`
+        ).join('');
+      }
+    });
+  });
+}
+
+function initHistorisUnifiedPanel() {
+  const today = new Date().toISOString().split('T')[0];
+  if ($('histDariTanggal') && !$('histDariTanggal').value) $('histDariTanggal').value = today;
+  if ($('histSampaiTanggal') && !$('histSampaiTanggal').value) $('histSampaiTanggal').value = today;
+  toggleHistKelas();
+  loadHistSesiDropdown();
+  sendRequest({ action: 'get_kelas' }, res => {
+    if (res.status !== 'success') return;
+    const opts = (res.data || []).map(k => `<option value="${k}">${k}</option>`).join('');
+    ['histKelas', 'pulihKelas', 'editHadirKelas'].forEach(id => {
+      const sel = $(id);
+      if (!sel) return;
+      const cur = sel.value;
+      sel.innerHTML = '<option value="">-- Semua --</option>' + opts;
+      if (cur) sel.value = cur;
+    });
+  });
+  try { initPulihAbsensiPanel(); } catch (e) {}
+  try { initEditKehadiran(); } catch (e) {}
+  syncHistFiltersToLegacy();
+}
+
+function tampilkanDataHistoris() {
+  syncHistFiltersToLegacy();
+  try { loadPulihPreview(); } catch (e) {}
+  try {
+    if (typeof assertSuperAdminEditHadir === 'function' && assertSuperAdminEditHadir()) {
+      loadEditKehadiran();
+    }
+  } catch (e) {
+    try { loadEditKehadiran(); } catch (e2) {}
+  }
+  const sum = $('histSummary');
+  if (sum) {
+    sum.style.display = 'block';
+    sum.textContent = 'Menampilkan data sesuai filter…';
+  }
+}
+
+function editTerpilihHistoris() {
+  syncHistFiltersToLegacy();
+  // Jika ada baris edit di cache, buka form edit baris pertama yang cocok
+  try {
+    if (typeof openFormEditKehadiranBaru === 'function') {
+      // Prefer edit mode: load data then user uses row actions; or open blank form
+      tampilkanDataHistoris();
+      showBigPopup('info', 'Edit Kehadiran',
+        'Data ditampilkan di tabel bawah. Gunakan tombol ✏️ pada baris untuk mengubah status, atau ➕ Tambah Manual.',
+        2800);
+      return;
+    }
+  } catch (e) {}
+  showBigPopup('info', 'Edit', 'Gunakan tombol ✏️ di tabel detail setelah menampilkan data.');
+}
+
 function initPulihAbsensiPanel() {
   const tgl = document.getElementById('pulihTanggal');
   if (tgl && !tgl.value) {
@@ -6430,6 +6533,7 @@ function collectPulihFilters() {
 }
 
 function loadPulihPreview() {
+  try { syncHistFiltersToLegacy(); } catch (e) {}
   const tbody = document.getElementById('tablePulihBody');
   const sum = document.getElementById('pulihSummary');
   if (tbody) tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;">⏳ Memuat...</td></tr>';
@@ -6477,6 +6581,7 @@ function togglePulihSelectAll(checked) {
 }
 
 function prosesPulihAbsensi(semua) {
+  try { syncHistFiltersToLegacy(); } catch (e) {}
   const payload = collectPulihFilters();
   payload.mode = 'proses';
   payload.semua = !!semua;
