@@ -2547,9 +2547,10 @@ let isCameraOn = false;
 let isProcessing = false;
 let userRole = 'tamu';
 window.MENU_BY_ROLE = {
-  tamu: ['cari'],
-  siswa: ['siswa-fingerprint', 'cek-syarat', 'ujian-siswa', 'lihat-nilai-saya', 'kelulusan', 'validasi-lulusan'],
-  guru: ['scanner', 'izin', 'rekap', 'jadwal-mapel', 'input-nilai', 'daftar-nilai', 'ujian-kelola', 'download-absensi'],
+  // Dashboard selalu terbuka untuk semua peran
+  tamu: ['dashboard', 'cari'],
+  siswa: ['dashboard', 'siswa-fingerprint', 'cek-syarat', 'ujian-siswa', 'lihat-nilai-saya', 'kelulusan', 'validasi-lulusan'],
+  guru: ['dashboard', 'scanner', 'izin', 'rekap', 'jadwal-mapel', 'input-nilai', 'daftar-nilai', 'ujian-kelola', 'download-absensi'],
   admin: [
     'dashboard', 'cari', 'siswa-fingerprint', 'cek-syarat', 'ujian-siswa', 'lihat-nilai-saya', 'kelulusan', 'validasi-lulusan',
     'scanner', 'izin', 'rekap', 'jadwal-mapel', 'input-nilai', 'daftar-nilai', 'ujian-kelola', 'download-absensi',
@@ -3043,11 +3044,9 @@ function goDashboardFromBack() {
   try {
     if (typeof getAllowedMenus === 'function') {
       const allowed = getAllowedMenus();
-      target = (allowed && allowed[0]) || 'cari';
-    } else if (typeof getEffectiveRole === 'function' && getEffectiveRole() === 'tamu') {
-      target = 'cari';
+      target = (allowed && allowed.includes('dashboard')) ? 'dashboard' : ((allowed && allowed[0]) || 'dashboard');
     }
-  } catch (e) { target = 'cari'; }
+  } catch (e) { target = 'dashboard'; }
   window._currentMenu = target;
   try {
     const nav = document.querySelector('.sidebar .nav-item[data-menu="' + target + '"]');
@@ -3253,7 +3252,7 @@ function restoreActiveMenu() {
   const savedMenu = getSavedActiveMenu();
   const navItem = document.querySelector(`.nav-item[data-menu="${savedMenu}"]`);
   const allowed = getAllowedMenus();
-  const fallback = allowed[0] || 'cari';
+  const fallback = allowed.includes('dashboard') ? 'dashboard' : (allowed[0] || 'dashboard');
   if (savedMenu && isMenuAllowed(savedMenu)) {
     switchMenu(savedMenu, navItem, true);
     return;
@@ -3477,8 +3476,8 @@ function logoutSiswaSession() {
   updateSyaratAccessUI();
   try { updateSidebarVisibility(); } catch (e) {}
   try {
-    saveActiveMenu('cari');
-    switchMenu('cari', document.querySelector('[data-menu="cari"]'));
+    saveActiveMenu('dashboard');
+    switchMenu('dashboard', document.querySelector('[data-menu="dashboard"]'));
   } catch (e) {}
   showBigPopup('success', 'Logout Berhasil', 'Anda telah keluar dari akun siswa.');
 }
@@ -4093,8 +4092,8 @@ function logoutSession() {
   updateTopbarUserInfo();
   updateFingerprintUI();
   try { updateSidebarVisibility(); } catch (e) {}
-  saveActiveMenu('cari');
-  switchMenu('cari', document.querySelector('[data-menu="cari"]'));
+  saveActiveMenu('dashboard');
+  switchMenu('dashboard', document.querySelector('[data-menu="dashboard"]'));
   showBigPopup("success", "Logout Berhasil", "Anda telah keluar.");
   closeSidebar();
 }
@@ -4108,7 +4107,7 @@ function getEffectiveRole() {
 function getAllowedMenus() {
   const role = getEffectiveRole();
   const map = window.MENU_BY_ROLE || {};
-  return map[role] || map.tamu || ['cari'];
+  return map[role] || map.tamu || ['dashboard', 'cari'];
 }
 
 function isMenuAllowed(menuName) {
@@ -4164,7 +4163,7 @@ function switchMenu(menuName, el, isRestoring = false) {
   closeProfileDropdown();
   if (!isRestoring && menuName && typeof isMenuAllowed === 'function' && !isMenuAllowed(menuName)) {
     const allowed = (typeof getAllowedMenus === 'function' ? getAllowedMenus() : ['cari']);
-    const fb = allowed[0] || 'cari';
+    const fb = (allowed.includes('dashboard') ? 'dashboard' : (allowed[0] || 'dashboard'));
     menuName = fb;
     el = document.querySelector('.sidebar .nav-item[data-menu="' + fb + '"]');
   }
