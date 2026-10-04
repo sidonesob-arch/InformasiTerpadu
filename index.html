@@ -1499,12 +1499,10 @@ th { background: var(--primary-lighter); color: var(--primary); font-weight: bol
     <div id="menu-pengaturan" class="section">
       <h3 style="color:var(--primary); font-size:15px;">⚙️ Pengaturan</h3>
       <div class="pengaturan-tabs">
-        <button class="pengaturan-tab-btn" data-tab="sesi" onclick="togglePengaturanPanel('sesi')"><span class="tab-icon">📋</span>Sesi Absensi</button>
+        <button class="pengaturan-tab-btn" data-tab="sesi" onclick="togglePengaturanPanel('sesi')"><span class="tab-icon">📅</span>Seting Absen / Sesi</button>
         <button class="pengaturan-tab-btn" data-tab="izin" onclick="togglePengaturanPanel('izin')"><span class="tab-icon">👆</span>Izin Sidik Jari</button>
         <button class="pengaturan-tab-btn" data-tab="buka-blokir-alpa" onclick="togglePengaturanPanel('buka-blokir-alpa')"><span class="tab-icon">🔓</span>Buka Blokir Alpa</button>
-        <button class="pengaturan-tab-btn" data-tab="reset-fingerprint" onclick="togglePengaturanPanel('reset-fingerprint')"><span class="tab-icon">👆</span>Reset Sidik Jari</button>
-        <button class="pengaturan-tab-btn" data-tab="reset-pin" onclick="togglePengaturanPanel('reset-pin')"><span class="tab-icon">🔑</span>Reset PIN</button>
-        <button class="pengaturan-tab-btn" data-tab="seting-absen" onclick="togglePengaturanPanel('seting-absen')"><span class="tab-icon">📅</span>Seting Absen</button>
+        <button class="pengaturan-tab-btn" data-tab="reset-pin-sidik" onclick="togglePengaturanPanel('reset-pin-sidik')"><span class="tab-icon">🔑</span>Reset PIN / Sidik Jari</button>
         <button class="pengaturan-tab-btn" data-tab="pin-guru" onclick="togglePengaturanPanel('pin-guru')"><span class="tab-icon">🔐</span>Isi PIN Guru</button>
         <button class="pengaturan-tab-btn" data-tab="hari-libur" onclick="togglePengaturanPanel('hari-libur')"><span class="tab-icon">🎉</span>Hari Libur</button>
         <button class="pengaturan-tab-btn" data-tab="historis" onclick="togglePengaturanPanel('historis')"><span class="tab-icon">📦</span>Historis</button>
@@ -1517,8 +1515,20 @@ th { background: var(--primary-lighter); color: var(--primary); font-weight: bol
 
       <!-- PANEL: SESI -->
       <div class="pengaturan-panel" id="panel-sesi">
-        <h4 class="panel-title">📋 Sesi Absensi</h4>
-        <div class="sesi-preview-wrap">
+        <h4 class="panel-title">📅 Seting Absen / Sesi</h4>
+
+        <div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:14px;">
+          <div style="font-size:12px;font-weight:700;color:var(--primary);margin-bottom:8px;">📅 Masa Berlaku Absensi</div>
+          <div style="display:flex; gap:12px; flex-wrap:wrap;">
+            <div class="form-group" style="flex:1; min-width:140px;"><label>Tanggal Mulai:</label><input type="date" id="setingAbsenMulai"></div>
+            <div class="form-group" style="flex:1; min-width:140px;"><label>Tanggal Akhir:</label><input type="date" id="setingAbsenAkhir"></div>
+            <div class="form-group" style="flex:1; min-width:120px;"><label>Batas Minimal (%):</label><input type="number" id="setingAbsenBatas" min="0" max="100" placeholder="80"></div>
+          </div>
+          <button class="btn-primary" style="width:auto; padding:8px 22px;" onclick="saveSettingAbsen()">💾 Simpan Seting Absen</button>
+        </div>
+
+        <div style="font-size:12px;font-weight:700;color:var(--primary);margin-bottom:8px;">📋 Sesi Absensi</div>
+<div class="sesi-preview-wrap">
           <div style="font-size:11px; font-weight:700; color:var(--primary); margin-bottom:6px;">📊 Daftar Sesi Tersimpan</div>
           <div class="table-responsive" style="margin-top:0;">
             <table class="sesi-preview-table">
@@ -1648,40 +1658,31 @@ th { background: var(--primary-lighter); color: var(--primary); font-weight: bol
       </div>
 
       <!-- PANEL: RESET SIDIK JARI -->
-      <div class="pengaturan-panel" id="panel-reset-fingerprint">
-        <h4 class="panel-title">👆 Reset Sidik Jari</h4>
-        <div style="display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap;">
-          <button class="btn-primary btn-sm" style="width:auto; padding:6px 14px;" onclick="loadResetFingerprintList()">🔄 Muat Ulang</button>
-          <button class="btn-primary btn-sm" style="width:auto; padding:6px 14px; background:var(--danger);" onclick="resetFingerprintAll()">⚠️ Reset Semua</button>
-          <button class="btn-success btn-sm" style="width:auto; padding:6px 14px;" onclick="resetFingerprintSelected()">✅ Reset Terpilih</button>
+      <div class="pengaturan-panel" id="panel-reset-pin-sidik">
+        <h4 class="panel-title">🔑 Reset PIN / Sidik Jari</h4>
+
+        <div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:14px;">
+          <div style="font-size:12px;font-weight:700;color:var(--primary);margin-bottom:8px;">👆 Reset Sidik Jari</div>
+          <div style="display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap;">
+            <button class="btn-primary btn-sm" style="width:auto; padding:6px 14px;" onclick="loadResetFingerprintList()">🔄 Muat Ulang</button>
+            <button class="btn-primary btn-sm" style="width:auto; padding:6px 14px; background:var(--danger);" onclick="resetFingerprintAll()">⚠️ Reset Semua</button>
+            <button class="btn-success btn-sm" style="width:auto; padding:6px 14px;" onclick="resetFingerprintSelected()">✅ Reset Terpilih</button>
+          </div>
+          <div class="reset-user-list" id="resetFingerprintList"><div style="text-align:center; padding:20px;">Memuat data...</div></div>
         </div>
-        <div class="reset-user-list" id="resetFingerprintList"><div style="text-align:center; padding:20px;">Memuat data...</div></div>
+
+        <div style="background:#fff;border:1px solid var(--border);border-radius:10px;padding:12px;">
+          <div style="font-size:12px;font-weight:700;color:var(--primary);margin-bottom:8px;">🔑 Reset PIN Guru</div>
+          <div style="display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap;">
+            <button class="btn-primary btn-sm" style="width:auto; padding:6px 14px;" onclick="loadResetPinList()">🔄 Muat Ulang</button>
+            <button class="btn-primary btn-sm" style="width:auto; padding:6px 14px; background:var(--danger);" onclick="resetPinAll()">⚠️ Reset Semua</button>
+            <button class="btn-success btn-sm" style="width:auto; padding:6px 14px;" onclick="resetPinSelected()">✅ Reset Terpilih</button>
+          </div>
+          <div class="reset-user-list" id="resetPinList"><div style="text-align:center; padding:20px;">Memuat data...</div></div>
+        </div>
       </div>
 
-      <!-- PANEL: RESET PIN -->
-      <div class="pengaturan-panel" id="panel-reset-pin">
-        <h4 class="panel-title">🔑 Reset PIN Guru</h4>
-        <div style="display:flex; gap:8px; margin-bottom:10px; flex-wrap:wrap;">
-          <button class="btn-primary btn-sm" style="width:auto; padding:6px 14px;" onclick="loadResetPinList()">🔄 Muat Ulang</button>
-          <button class="btn-primary btn-sm" style="width:auto; padding:6px 14px; background:var(--danger);" onclick="resetPinAll()">⚠️ Reset Semua</button>
-          <button class="btn-success btn-sm" style="width:auto; padding:6px 14px;" onclick="resetPinSelected()">✅ Reset Terpilih</button>
-        </div>
-        <div class="reset-user-list" id="resetPinList"><div style="text-align:center; padding:20px;">Memuat data...</div></div>
-      </div>
-
-      <!-- PANEL: SETING ABSEN -->
-      <div class="pengaturan-panel" id="panel-seting-absen">
-        <h4 class="panel-title">📅 Seting Absen (Masa Berlaku)</h4>
-        <div style="display:flex; gap:12px; flex-wrap:wrap;">
-          <div class="form-group" style="flex:1; min-width:180px;"><label>Tanggal Mulai:</label><input type="date" id="setingAbsenMulai"></div>
-          <div class="form-group" style="flex:1; min-width:180px;"><label>Tanggal Akhir:</label><input type="date" id="setingAbsenAkhir"></div>
-          <div class="form-group" style="flex:1; min-width:180px;"><label>Batas Minimal (%):</label><input type="number" id="setingAbsenBatas" min="0" max="100" placeholder="80"></div>
-        </div>
-        <button class="btn-primary" style="width:auto; padding:8px 22px;" onclick="saveSettingAbsen()">💾 Simpan</button>
-      </div>
-
-      <!-- PANEL: ISI PIN GURU -->
-      <div class="pengaturan-panel" id="panel-pin-guru">
+<div class="pengaturan-panel" id="panel-pin-guru">
         <h4 class="panel-title">🔐 Isi / Ganti PIN Guru</h4>
         <div class="pin-list" id="pinGuruList"><div style="text-align:center; padding:20px;">Memuat data...</div></div>
       </div>
@@ -5543,6 +5544,9 @@ function loadPengumumanKelulusan() {
 }
 
 function togglePengaturanPanel(tab) {
+  // Alias tab lama → panel gabungan
+  if (tab === 'reset-fingerprint' || tab === 'reset-pin') tab = 'reset-pin-sidik';
+  if (tab === 'seting-absen') tab = 'sesi';
   const panels = $$('.pengaturan-panel');
   const buttons = $$('.pengaturan-tab-btn');
   const targetPanel = $(`panel-${tab}`);
@@ -5558,10 +5562,15 @@ function togglePengaturanPanel(tab) {
   targetPanel?.classList.add('open');
   targetBtn?.classList.add('active');
   activePengaturanPanel = tab;
-  if (tab === 'reset-fingerprint') loadResetFingerprintList();
-  if (tab === 'reset-pin') loadResetPinList();
+  if (tab === 'reset-pin-sidik' || tab === 'reset-fingerprint' || tab === 'reset-pin') {
+    try { loadResetFingerprintList(); } catch (e) {}
+    try { loadResetPinList(); } catch (e) {}
+  }
   if (tab === 'pin-guru') loadPinGuruList();
-  if (tab === 'seting-absen') loadSettingAbsen();
+  if (tab === 'sesi' || tab === 'seting-absen') {
+    try { loadSettingAbsen(); } catch (e) {}
+    try { if (typeof loadPengaturanDataFromServer === 'function') { /* sesi list ikut pengaturan */ } } catch (e) {}
+  }
   if (tab === 'historis') {
     try { initHistorisUnifiedPanel(); } catch (e) {}
     try { loadHistorisInfo(); } catch (e) {}
