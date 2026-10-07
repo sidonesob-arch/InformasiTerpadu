@@ -1815,16 +1815,18 @@ th { background: var(--primary-lighter); color: var(--primary); font-weight: bol
           <table id="tableEditHadir">
             <thead id="tableEditHadirHead">
               <tr>
-                <th>Waktu</th>
+                <th>Timestamp</th>
                 <th>Peran</th>
                 <th>ID</th>
                 <th>Nama</th>
-                <th>Status</th>
-                <th style="width:120px;text-align:center;">Aksi</th>
+                <th style="text-align:center;">S1</th>
+                <th style="text-align:center;">S2</th>
+                <th style="text-align:center;">S3</th>
+                <th style="width:90px;text-align:center;">Aksi</th>
               </tr>
             </thead>
             <tbody id="tableEditHadirBody">
-              <tr><td colspan="6" style="text-align:center;color:#94a3b8;">Detail catatan absensi muncul di sini setelah Tampilkan Data.</td></tr>
+              <tr><td colspan="8" style="text-align:center;color:#94a3b8;">Detail kehadiran (1 baris = 1 hari per orang) muncul setelah Tampilkan Data.</td></tr>
             </tbody>
           </table>
         </div>
@@ -4472,12 +4474,11 @@ function statusBadgeHtml(st) {
 function loadEditKehadiran(silent) {
   try { syncHistFiltersToLegacy(); } catch (e) {}
   if (!assertSuperAdminEditHadir(!!silent)) return;
-  const role = $('editHadirRole').value;
+  const role = $('editHadirRole')?.value || 'siswa';
   const kelas = $('editHadirKelas')?.value || '';
-  const tglMulai = $('editHadirTglMulai').value;
-  const tglSelesai = $('editHadirTglSelesai').value;
+  const tglMulai = $('editHadirTglMulai')?.value || '';
+  const tglSelesai = $('editHadirTglSelesai')?.value || '';
   const keyword = ($('editHadirKeyword')?.value || '').trim().toLowerCase();
-  // Tanggal opsional jika ada keyword (mirip Cari Data). Jika diisi, dipakai sebagai filter.
   const kw = ($('editHadirKeyword')?.value || '').trim();
   if (!kw && (!tglMulai || !tglSelesai)) {
     return showBigPopup('warning', 'Peringatan', 'Isi kata kunci (nama/NISN) atau rentang tanggal terlebih dahulu!');
@@ -4496,10 +4497,12 @@ function loadEditKehadiran(silent) {
   }, res => {
     closeBigPopup();
     const tbody = $('tableEditHadirBody');
+    const thead = $('tableEditHadirHead');
     const summary = $('editHadirSummary');
     if (res.status !== 'success') {
       editHadirFlatCache = [];
-      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;color:red;">${res.message || 'Gagal memuat data'}</td></tr>`;
+      editHadirCache = [];
+      if (tbody) tbody.innerHTML = `<tr><td colspan="12" style="text-align:center;color:red;">${res.message || 'Gagal memuat data'}</td></tr>`;
       if (summary) summary.style.display = 'none';
       return;
     }
@@ -4512,7 +4515,7 @@ function loadEditKehadiran(silent) {
       tanggal: r.tanggal || r.tgl || (r.timestamp ? String(r.timestamp).substring(0, 10) : ''),
       jam: r.jam || r.jamScan || '',
       timestamp: r.timestamp || '',
-      sesi: r.sesi || r.session || '',
+      sesi: String(r.sesi || r.session || '').trim(),
       status: r.status || r.status_raw || '-',
       status_raw: r.status_raw || r.status || '',
       status_label: r.status_label || '',
@@ -4533,62 +4536,128 @@ function loadEditKehadiran(silent) {
       );
     }
 
-    // Urutkan terbaru dulu (mirip Cari Data)
     flat.sort((a, b) => String(b.timestamp || b.tanggal).localeCompare(String(a.timestamp || a.tanggal)));
-    // reindex
     flat.forEach((r, i) => { r._idx = i; });
     editHadirFlatCache = flat;
-    editHadirCache = flat;
+
+    // Group: 1 baris = 1 orang + 1 tanggal
+    const sesiSet = new Set();
+    const groupMap = new Map();
+    const prio = (st) => {
+      const u = String(st || '').toUpperCase();
+      if (u === 'TW' || u === 'TL' || u === 'H' || u === 'HADIR') return 1;
+      if (u === 'SAKIT' || u === 'IZIN' || u === 'S' || u === 'I') return 2;
+      if (u === 'B' || u === 'BOLOS') return 3;
+      if (u === 'A' || u === 'ALPA') return 4;
+      return 9;
+    };
+    for (const r of flat) {
+      if (r.sesi) sesiSet.add(r.sesi);
+      const key = String(r.id) + '|' + String(r.tanggal || '');
+      if (!groupMap.has(key)) {
+        groupMap.set(key, {
+          _gidx: 0,
+          id: r.id,
+          nama: r.nama,
+          unit: r.unit,
+          tanggal: r.tanggal,
+          peran: r.peran,
+          role: r.role || role,
+          timestamp: r.timestamp || '',
+          bySesi: {},
+          rows: []
+        });
+      }
+      const g = groupMap.get(key);
+      if (r.timestamp && (!g.timestamp || String(r.timestamp) > String(g.timestamp))) {
+        g.timestamp = r.timestamp;
+      }
+      if (!g.nama && r.nama) g.nama = r.nama;
+      if (r.sesi) {
+        const prev = g.bySesi[r.sesi];
+        if (!prev || prio(r.status) < prio(prev.status)) g.bySesi[r.sesi] = r;
+      }
+      g.rows.push(r);
+    }
+
+    let sesiCols = (editHadirSesiNames || []).slice().filter(Boolean);
+    const lowerExisting = new Set(sesiCols.map(s => String(s).toLowerCase()));
+    Array.from(sesiSet).sort((a, b) => a.localeCompare(b, undefined, { numeric: true })).forEach(s => {
+      if (!lowerExisting.has(String(s).toLowerCase())) {
+        sesiCols.push(s);
+        lowerExisting.add(String(s).toLowerCase());
+      }
+    });
+    if (!sesiCols.length) sesiCols = Array.from(sesiSet).sort((a, b) => a.localeCompare(b, undefined, { numeric: true }));
+    if (!sesiCols.length) sesiCols = ['Sesi 1', 'Sesi 2', 'Sesi 3'];
+    editHadirSesiNames = sesiCols;
+
+    const groups = Array.from(groupMap.values());
+    groups.sort((a, b) => {
+      const t = String(b.timestamp || b.tanggal).localeCompare(String(a.timestamp || a.tanggal));
+      if (t !== 0) return t;
+      return String(a.nama || '').localeCompare(String(b.nama || ''));
+    });
+    groups.forEach((g, i) => { g._gidx = i; });
+    editHadirCache = groups;
+
+    const colCount = 5 + sesiCols.length;
+
+    if (thead) {
+      thead.innerHTML = `<tr>
+        <th>Timestamp</th>
+        <th>Peran</th>
+        <th>ID</th>
+        <th>Nama</th>
+        ${sesiCols.map((s, i) => `<th title="${escHtmlEdit(s)}" style="text-align:center;min-width:48px;">S${i + 1}</th>`).join('')}
+        <th style="width:90px;text-align:center;">Aksi</th>
+      </tr>`;
+    }
 
     if (summary) {
       summary.style.display = 'block';
       const mu = res.matched_users != null ? ` • Cocok: <b>${res.matched_users}</b>` : '';
       const wr = res.with_record != null ? ` • Punya absensi: <b>${res.with_record}</b>` : '';
-      summary.innerHTML = `📊 Tipe: <b>${role.toUpperCase()}</b>${role === 'siswa' ? ' • Kelas: <b>' + (kelas || 'Semua') + '</b>' : ''} • Periode: <b>${tglMulai}</b> s/d <b>${tglSelesai}</b> • Tampil: <b>${flat.length}</b> baris` +
-        (keyword ? ` • Cari: <b>${escHtmlEdit(keyword)}</b>` : '') + mu + wr;
+      const sesiLegend = sesiCols.map((s, i) => `S${i + 1}=${s}`).join(', ');
+      summary.innerHTML = `📊 Tipe: <b>${role.toUpperCase()}</b>${role === 'siswa' ? ' • Kelas: <b>' + (kelas || 'Semua') + '</b>' : ''} • Periode: <b>${tglMulai || '—'}</b> s/d <b>${tglSelesai || '—'}</b> • <b>${groups.length}</b> baris (hari·orang) / <b>${flat.length}</b> catatan` +
+        (keyword ? ` • Cari: <b>${escHtmlEdit(keyword)}</b>` : '') + mu + wr +
+        `<br><span style="font-size:11px;color:#64748b;">Keterangan: ${escHtmlEdit(sesiLegend)}. S1, S2, S3 dst dinamis menyesuaikan status di tabel kehadiran &amp; historis.</span>`;
     }
 
-    if (!flat.length) {
+    if (!tbody) return;
+
+    if (!groups.length) {
       const mu = res.matched_users;
       let hint;
       if (keyword && mu === 1) {
-        hint = `Siswa/guru "<b>${escHtmlEdit(keyword)}</b>" ditemukan, tetapi <b>tidak ada baris absensi</b> untuk filter tanggal ini.<br>
-          <span style="font-size:11px;color:#666;">Coba kosongkan tanggal, atau samakan rentang dengan menu Cari Data. Pastikan backend terbaru sudah di-deploy.</span>`;
+        hint = `Siswa/guru "<b>${escHtmlEdit(keyword)}</b>" ditemukan, tetapi <b>tidak ada baris absensi</b> untuk filter tanggal ini.`;
       } else if (keyword) {
-        hint = `Tidak ada data untuk "<b>${escHtmlEdit(keyword)}</b>" pada filter ini. Gunakan <b>➕ Tambah / Ubah Manual</b>.`;
+        hint = `Tidak ada data untuk "<b>${escHtmlEdit(keyword)}</b>" pada filter ini. Gunakan <b>➕ Tambah Manual</b>.`;
       } else {
         hint = 'Tidak ada data pada filter ini.';
       }
-      tbody.innerHTML = `<tr><td colspan="6" style="text-align:center;padding:16px;">${hint}</td></tr>`;
+      tbody.innerHTML = `<tr><td colspan="${colCount}" style="text-align:center;padding:16px;">${hint}</td></tr>`;
       return;
     }
 
-    tbody.innerHTML = flat.map((r) => {
-      // Format waktu seperti Cari Data
-      let waktu = r.timestamp || '';
-      if (!waktu || waktu === '-') {
-        waktu = r.tanggal ? (r.tanggal + (r.jam ? ' ' + r.jam : '')) : '-';
-      }
-      // Status: "Sesi 1 - TW" sama persis seperti Cari Data Kehadiran
-      let statusText = r.status_label
-        || (r.raw && r.raw.status_label)
-        || ((r.sesi ? r.sesi + ' - ' : '') + (r.status || r.status_raw || '-'));
-      if (r.is_placeholder || (!r.row_id && !r.sesi)) {
-        statusText = 'Belum ada catatan — klik ➕ untuk menambah';
-      }
-      const isPh = !!r.is_placeholder;
+    tbody.innerHTML = groups.map((g) => {
+      let waktu = g.timestamp || '';
+      if (!waktu || waktu === '-') waktu = g.tanggal || '-';
+      else if (String(waktu).length > 19) waktu = String(waktu).substring(0, 19);
+      const sesiCells = sesiCols.map((sName) => {
+        const rec = g.bySesi[sName];
+        const st = rec ? (rec.status || rec.status_raw || '-') : '';
+        return `<td style="text-align:center;white-space:nowrap;">${statusBadgeHtml(st)}</td>`;
+      }).join('');
       return `<tr>
-        <td style="font-size:12px;white-space:nowrap;">${escHtmlEdit(waktu)}</td>
-        <td>${escHtmlEdit(r.peran || (role === 'guru' ? 'GURU' : 'SISWA'))}</td>
-        <td style="font-family:monospace;font-size:12px;">${escHtmlEdit(r.id)}</td>
-        <td>${escHtmlEdit(r.nama)}</td>
-        <td><b>${escHtmlEdit(statusText)}</b></td>
+        <td style="font-size:11px;white-space:nowrap;">${escHtmlEdit(waktu)}</td>
+        <td>${escHtmlEdit(g.peran)}</td>
+        <td style="font-family:monospace;font-size:12px;">${escHtmlEdit(g.id)}</td>
+        <td>${escHtmlEdit(g.nama)}</td>
+        ${sesiCells}
         <td style="text-align:center;white-space:nowrap;">
-          <button class="btn-add" style="width:28px;height:28px;padding:0;font-size:12px;" title="Tambah status"
-            onclick="openFormEditKehadiranBaruPrefill('${escHtmlEdit(r.id)}','${escHtmlEdit(r.nama)}','${escHtmlEdit(r.tanggal || tglMulai)}')">➕</button>
-          <button class="btn-edit" title="Edit status"
-            onclick="openFormEditKehadiran(${r._idx})">✏️</button>
-          ${r.is_placeholder ? '' : `<button class="btn-danger" title="Hapus catatan" onclick="hapusKehadiranRow(${r._idx})">🗑️</button>`}
+          <button class="btn-edit" title="Edit semua sesi hari ini" onclick="openFormEditKehadiranHariLengkap(${g._gidx})">✏️</button>
+          <button class="btn-danger" title="Hapus semua sesi hari ini" onclick="hapusKehadiranHari(${g._gidx})">🗑️</button>
         </td>
       </tr>`;
     }).join('');
@@ -4618,6 +4687,159 @@ function statusOptionsHtml(selected) {
   }).join('');
 }
 
+
+function openFormEditKehadiranHariLengkap(gidx) {
+  if (!assertSuperAdminEditHadir()) return;
+  const g = editHadirCache.find(x => x._gidx === gidx);
+  if (!g) return showBigPopup('warning', 'Info', 'Data tidak ditemukan. Muat ulang daftar.');
+  const sesiCols = (editHadirSesiNames && editHadirSesiNames.length) ? editHadirSesiNames.slice() : Object.keys(g.bySesi || {});
+  if (!sesiCols.length) { sesiCols.push('Sesi 1', 'Sesi 2'); }
+
+  const rowsHtml = sesiCols.map((sName, i) => {
+    const rec = (g.bySesi && g.bySesi[sName]) ? g.bySesi[sName] : null;
+    const cur = rec ? (rec.status || rec.status_raw || '') : '';
+    const jam = rec ? (rec.jam || '') : '';
+    return `
+      <div class="form-group" style="border:1px solid #e2e8f0;border-radius:8px;padding:10px;margin-bottom:8px;background:#f8fafc;">
+        <label style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+          <span style="display:inline-flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:50%;background:#05285e;color:#fff;font-weight:800;font-size:11px;">S${i + 1}</span>
+          <b>${escHtmlEdit(sName)}</b>
+          ${rec ? '' : '<span style="font-size:10px;color:#b45309;margin-left:6px;">(belum ada catatan)</span>'}
+        </label>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+          <div>
+            <label style="font-size:11px;">Status:</label>
+            <select class="fm-hari-status" data-sesi="${escHtmlEdit(sName)}" id="fmHariStatus_${i}">${statusOptionsHtml(cur || 'TW')}</select>
+          </div>
+          <div>
+            <label style="font-size:11px;">Jam (opsional):</label>
+            <input type="text" class="fm-hari-jam" data-sesi="${escHtmlEdit(sName)}" id="fmHariJam_${i}" value="${escHtmlEdit(jam)}" placeholder="07:15:00">
+          </div>
+        </div>
+      </div>`;
+  }).join('');
+
+  const formHtml = `
+    <div style="background:var(--primary-lighter);padding:10px;border-radius:8px;margin-bottom:12px;font-size:12px;">
+      Edit <b>semua sesi</b> untuk satu hari:<br>
+      <b>${escHtmlEdit(g.nama)}</b> (${escHtmlEdit(g.id)}) · ${escHtmlEdit(g.peran)} · <b>${escHtmlEdit(g.tanggal)}</b>
+    </div>
+    <input type="hidden" id="fmEditHadirRole" value="${escHtmlEdit(g.role || 'siswa')}">
+    <input type="hidden" id="fmEditHadirId" value="${escHtmlEdit(g.id)}">
+    <input type="hidden" id="fmEditHadirTgl" value="${escHtmlEdit(g.tanggal)}">
+    <input type="hidden" id="fmEditHadirGidx" value="${g._gidx}">
+    ${rowsHtml}
+    <div class="form-group">
+      <label>Keterangan (opsional):</label>
+      <input type="text" id="fmEditHadirKet" placeholder="Alasan koreksi">
+    </div>
+  `;
+  openFormModal('✏️ Edit Kehadiran · ' + (g.tanggal || ''), formHtml, submitEditKehadiranHariLengkap);
+  setTimeout(() => {
+    if ($('formModalSaveBtn')) $('formModalSaveBtn').innerText = '💾 Simpan Semua Sesi';
+  }, 30);
+}
+
+function submitEditKehadiranHariLengkap() {
+  if (!assertSuperAdminEditHadir()) return;
+  const role = ($('fmEditHadirRole')?.value || '').trim();
+  const id = ($('fmEditHadirId')?.value || '').trim();
+  const tanggal = ($('fmEditHadirTgl')?.value || '').trim();
+  const keterangan = ($('fmEditHadirKet')?.value || '').trim();
+  if (!id || !tanggal) return showBigPopup('warning', 'Peringatan', 'ID dan tanggal wajib.');
+
+  const statusEls = Array.from(document.querySelectorAll('.fm-hari-status'));
+  if (!statusEls.length) return showBigPopup('warning', 'Peringatan', 'Tidak ada sesi untuk disimpan.');
+
+  const items = statusEls.map((sel, idx) => {
+    const sesi = sel.getAttribute('data-sesi') || '';
+    const jamEl = document.getElementById('fmHariJam_' + idx);
+    return {
+      sesi,
+      status: (sel.value || '').trim(),
+      jam: jamEl ? (jamEl.value || '').trim() : ''
+    };
+  }).filter(x => x.sesi && x.status);
+
+  if (!items.length) return showBigPopup('warning', 'Peringatan', 'Pilih minimal satu status sesi.');
+
+  showBigPopup('info', 'Menyimpan', '⏳ Menyimpan ' + items.length + ' sesi...', 0);
+  let ok = 0, fail = 0;
+  const errors = [];
+
+  const next = (i) => {
+    if (i >= items.length) {
+      closeBigPopup();
+      const msg = 'Selesai: ' + ok + ' sesi disimpan' + (fail ? ', ' + fail + ' gagal' : '.') +
+        (errors.length ? '<br><small>' + errors.slice(0, 5).join('<br>') + '</small>' : '');
+      showBigPopup(fail && !ok ? 'danger' : 'success', 'Edit Kehadiran', msg);
+      if (ok) {
+        closeFormModal();
+        loadEditKehadiran();
+        if (typeof fetchDashboardData === 'function') fetchDashboardData();
+      }
+      return;
+    }
+    const it = items[i];
+    sendRequest({
+      action: 'edit_kehadiran',
+      role, id, tanggal,
+      sesi: it.sesi,
+      status: it.status,
+      jam: it.jam || undefined,
+      keterangan: keterangan || 'Koreksi manual via Edit Kehadiran (per hari)',
+      propagate: false
+    }, res => {
+      if (res && res.status === 'success') ok++;
+      else {
+        fail++;
+        errors.push((it.sesi || '') + ': ' + ((res && res.message) || 'gagal'));
+      }
+      next(i + 1);
+    });
+  };
+  next(0);
+}
+
+function hapusKehadiranHari(gidx) {
+  if (!assertSuperAdminEditHadir()) return;
+  const g = editHadirCache.find(x => x._gidx === gidx);
+  if (!g) return;
+  const sesiList = Object.keys(g.bySesi || {});
+  if (!sesiList.length) return showBigPopup('warning', 'Info', 'Tidak ada catatan sesi untuk dihapus.');
+  if (!confirm('Hapus SEMUA sesi kehadiran?\n' + g.nama + ' (' + g.id + ')\nTanggal: ' + g.tanggal + '\nSesi: ' + sesiList.join(', '))) return;
+
+  showBigPopup('info', 'Menghapus', '⏳ Menghapus ' + sesiList.length + ' sesi...', 0);
+  let ok = 0, fail = 0;
+  const next = (i) => {
+    if (i >= sesiList.length) {
+      closeBigPopup();
+      showBigPopup(fail && !ok ? 'danger' : 'success', 'Hapus', 'Dihapus: ' + ok + ' sesi' + (fail ? ', gagal: ' + fail : '.'));
+      if (ok) {
+        loadEditKehadiran();
+        if (typeof fetchDashboardData === 'function') fetchDashboardData();
+      }
+      return;
+    }
+    const sesi = sesiList[i];
+    const rec = g.bySesi[sesi];
+    sendRequest({
+      action: 'hapus_kehadiran',
+      role: g.role || 'siswa',
+      id: g.id,
+      tanggal: g.tanggal,
+      sesi,
+      status: rec ? rec.status : '',
+      sumber: rec ? (rec.sumber || '') : '',
+      row_id: null
+    }, res => {
+      if (res && res.status === 'success') ok++;
+      else fail++;
+      next(i + 1);
+    });
+  };
+  next(0);
+}
 
 function openFormEditKehadiranBaruPrefill(userId, nama, tanggal) {
   if (!assertSuperAdminEditHadir()) return;
