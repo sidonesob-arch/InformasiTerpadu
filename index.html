@@ -1364,17 +1364,64 @@ th { background: var(--primary-lighter); color: var(--primary); font-weight: bol
         <button class="btn-excel" onclick="exportRekapToExcel()">📊 Excel</button>
         <button class="btn-pdf" onclick="window.print()">🖨️ PDF</button>
       </div>
+
+      <!-- Bulk ubah status A → TW/TL -->
+      <div id="rekapBulkABox" style="background:#fff7ed;border:1px solid #fdba74;border-radius:10px;padding:12px 14px;margin:10px 0 12px;">
+        <div style="font-size:12px;font-weight:800;color:#9a3412;margin-bottom:6px;">⚡ Ubah status Alpa (A) massal → TW / TL</div>
+        <p style="font-size:11px;color:#9a3412;margin:0 0 10px;line-height:1.45;">
+          Hanya <b>mengubah status</b> baris Alpa yang sudah ada.
+          <b>Tidak menambah sesi baru</b> — total sesi efektif tidak membengkak.<br>
+          Mode <b>Sampai target %</b>: hanya mengubah <i>cukup</i> A agar % hadir mencapai target (sisa A tetap).
+        </p>
+        <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;">
+          <div class="form-group" style="margin:0;min-width:110px;">
+            <label style="font-size:11px;">Target status</label>
+            <select id="rekapBulkTargetStatus" style="padding:6px 8px;font-size:12px;">
+              <option value="TW">TW (Tepat Waktu)</option>
+              <option value="TL">TL (Terlambat)</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin:0;min-width:130px;">
+            <label style="font-size:11px;">Target / filter %</label>
+            <select id="rekapBulkPersen" style="padding:6px 8px;font-size:12px;">
+              <option value="">— pilih % —</option>
+              <option value="70">70%</option>
+              <option value="75">75%</option>
+              <option value="80">80%</option>
+              <option value="85">85%</option>
+              <option value="90">90%</option>
+              <option value="95">95%</option>
+              <option value="100">100%</option>
+            </select>
+          </div>
+          <button type="button" class="btn-primary" style="width:auto;background:#ea580c;padding:8px 12px;font-size:11px;" onclick="bulkUbahStatusATerpilih()" title="Ubah SEMUA A pada siswa yang dicentang">
+            A terpilih → semua
+          </button>
+          <button type="button" class="btn-primary" style="width:auto;background:#c2410c;padding:8px 12px;font-size:11px;" onclick="bulkUbahStatusAByPersen()" title="Ubah SEMUA A pada siswa dengan % di bawah filter">
+            Semua A (filter %)
+          </button>
+          <button type="button" class="btn-primary" style="width:auto;background:#7c2d12;padding:8px 12px;font-size:11px;" onclick="bulkUbahStatusAUntilTarget()" title="Ubah cukup A agar % mencapai target">
+            Sampai target %
+          </button>
+          <label style="font-size:11px;display:flex;align-items:center;gap:6px;cursor:pointer;margin:0;">
+            <input type="checkbox" id="rekapCheckAll" style="width:16px;height:16px;" onchange="toggleRekapSelectAll(this.checked)">
+            Pilih semua
+          </label>
+        </div>
+      </div>
+
       <div class="table-responsive">
         <p id="labelTotalHari" style="font-weight:bold; color:var(--primary); font-size:12px;"></p>
         <table id="tableRekap">
           <thead>
             <tr>
+              <th style="width:36px;text-align:center;">✓</th>
               <th>ID</th><th>Nama</th><th>Unit</th>
               <th>TW</th><th>TL</th><th>Izin</th><th>Sakit</th><th>Alpa</th><th>Bolos</th>
               <th>Sesi Tercatat</th><th>Nilai Hadir</th><th>%</th>
             </tr>
           </thead>
-          <tbody id="tableRekapBody"><tr><td colspan="12" style="text-align:center;">Pilih filter dan klik Tampilkan.</td></tr></tbody>
+          <tbody id="tableRekapBody"><tr><td colspan="13" style="text-align:center;">Pilih filter dan klik Tampilkan.</td></tr></tbody>
         </table>
       </div>
     </div>
@@ -4560,7 +4607,7 @@ function loadEditKehadiran(silent) {
     if (res.status !== 'success') {
       editHadirFlatCache = [];
       editHadirCache = [];
-      if (tbody) tbody.innerHTML = `<tr><td colspan="12" style="text-align:center;color:red;">${res.message || 'Gagal memuat data'}</td></tr>`;
+      if (tbody) tbody.innerHTML = `<tr><td colspan="13" style="text-align:center;color:red;">${res.message || 'Gagal memuat data'}</td></tr>`;
       if (summary) summary.style.display = 'none';
       return;
     }
@@ -5261,6 +5308,103 @@ function hitungPersenHadir(nilaiHadir, totalSesi) {
   return Math.round((Number(nilaiHadir) / tot) * 10000) / 100;
 }
 
+
+function toggleRekapSelectAll(checked) {
+  document.querySelectorAll('.rekap-check:not(:disabled)').forEach(c => { c.checked = !!checked; });
+}
+
+function getRekapBulkPayload(ids, mode) {
+  const target = ($('rekapBulkTargetStatus') && $('rekapBulkTargetStatus').value) || 'TW';
+  const persenSel = ($('rekapBulkPersen') && $('rekapBulkPersen').value) || '';
+  const pct = persenSel ? Number(persenSel) : null;
+  return {
+    action: 'bulk_ubah_status_a',
+    role: ($('rekapRole') && $('rekapRole').value) || 'siswa',
+    kelas: ($('rekapKelas') && $('rekapKelas').value) || '',
+    tglMulai: ($('rekapTglMulai') && $('rekapTglMulai').value) || '',
+    tglSelesai: ($('rekapTglSelesai') && $('rekapTglSelesai').value) || '',
+    tahun_ajaran: ($('rekapTahunAjaran') && $('rekapTahunAjaran').value) || (window.periodeAktif && window.periodeAktif.tahun_ajaran) || '',
+    semester: ($('rekapSemester') && $('rekapSemester').value) || (window.periodeAktif && window.periodeAktif.semester) || 'ganjil',
+    target_status: target,
+    mode: mode || 'selected',
+    ids: ids || [],
+    persen_max: pct,
+    persen_target: pct,
+  };
+}
+
+function _fmtBulkDetail(res) {
+  let msg = res.message || 'Selesai';
+  if (res.detail && res.detail.length) {
+    const lines = res.detail.slice(0, 8).map(d =>
+      `${d.id}: ${d.diubah} A diubah · ${d.persen_sebelum}% → ${d.persen_sesudah}% (sisa A: ${d.alpa_tersisa})`
+    );
+    msg += '<br><small style="display:block;margin-top:8px;text-align:left;line-height:1.5;">' + lines.join('<br>') +
+      (res.detail.length > 8 ? '<br>…' : '') + '</small>';
+  }
+  return msg;
+}
+
+function bulkUbahStatusATerpilih() {
+  const persenMax = ($('rekapBulkPersen') && $('rekapBulkPersen').value) ? Number($('rekapBulkPersen').value) : null;
+  const target = ($('rekapBulkTargetStatus') && $('rekapBulkTargetStatus').value) || 'TW';
+  let checks = Array.from(document.querySelectorAll('.rekap-check:checked:not(:disabled)'));
+  if (persenMax != null && !Number.isNaN(persenMax)) {
+    checks = checks.filter(c => Number(c.getAttribute('data-persen') || 0) < persenMax);
+  }
+  const ids = checks.map(c => c.value);
+  if (!ids.length) {
+    return showBigPopup('warning', 'Peringatan',
+      persenMax != null
+        ? 'Tidak ada siswa terpilih dengan Alpa dan % hadir < ' + persenMax + '%.'
+        : 'Centang minimal 1 siswa yang masih punya Alpa.');
+  }
+  if (!confirm('Ubah SEMUA status Alpa (A) → ' + target + ' untuk ' + ids.length + ' siswa terpilih?\n\nHanya mengubah status yang sudah ada, tidak menambah sesi.')) return;
+  showBigPopup('info', 'Memproses', '⏳ Mengubah semua A → ' + target + '...', 0);
+  sendRequest(getRekapBulkPayload(ids, 'selected'), res => {
+    closeBigPopup();
+    showBigPopup(res.status === 'success' ? 'success' : 'danger', 'Hasil', _fmtBulkDetail(res));
+    if (res.status === 'success') loadRekap();
+  });
+}
+
+function bulkUbahStatusAByPersen() {
+  const persenSel = ($('rekapBulkPersen') && $('rekapBulkPersen').value) || '';
+  if (!persenSel) return showBigPopup('warning', 'Peringatan', 'Pilih filter persen dulu (70%–100%).');
+  const target = ($('rekapBulkTargetStatus') && $('rekapBulkTargetStatus').value) || 'TW';
+  if (!confirm('Ubah SEMUA status Alpa (A) → ' + target + ' untuk siswa dengan % hadir < ' + persenSel + '%?\n\nHanya mengubah status yang sudah ada, tidak menambah sesi.')) return;
+  showBigPopup('info', 'Memproses', '⏳ Mengubah semua A (filter %)...', 0);
+  sendRequest(getRekapBulkPayload([], 'by_persen'), res => {
+    closeBigPopup();
+    showBigPopup(res.status === 'success' ? 'success' : 'danger', 'Hasil', _fmtBulkDetail(res));
+    if (res.status === 'success') loadRekap();
+  });
+}
+
+function bulkUbahStatusAUntilTarget() {
+  const persenSel = ($('rekapBulkPersen') && $('rekapBulkPersen').value) || '';
+  if (!persenSel) return showBigPopup('warning', 'Peringatan', 'Pilih target persen dulu (70%–100%).');
+  const target = ($('rekapBulkTargetStatus') && $('rekapBulkTargetStatus').value) || 'TW';
+  const checks = Array.from(document.querySelectorAll('.rekap-check:checked:not(:disabled)'));
+  const ids = checks.map(c => c.value);
+  const scope = ids.length
+    ? (ids.length + ' siswa terpilih')
+    : 'SEMUA siswa di filter rekap yang belum mencapai target';
+  if (!confirm(
+    'Mode SAMPAI TARGET ' + persenSel + '%\n\n' +
+    'Ubah cukup status Alpa (A) → ' + target + ' agar % hadir mencapai ' + persenSel + '%.\n' +
+    'Lingkup: ' + scope + '.\n\n' +
+    'Sisa Alpa di atas target TIDAK diubah. Jumlah sesi tidak bertambah.'
+  )) return;
+  showBigPopup('info', 'Memproses', '⏳ Mengubah cukup A sampai ' + persenSel + '%...', 0);
+  sendRequest(getRekapBulkPayload(ids, 'until_target'), res => {
+    closeBigPopup();
+    showBigPopup(res.status === 'success' ? 'success' : 'danger', 'Hasil', _fmtBulkDetail(res));
+    if (res.status === 'success') loadRekap();
+  });
+}
+
+
 function loadRekap() {
   let tglMulai = ($('rekapTglMulai').value || '').trim();
   let tglSelesai = ($('rekapTglSelesai').value || '').trim();
@@ -5279,7 +5423,7 @@ function loadRekap() {
     const detailSesi = nHari ? ` (${nHari} hari sekolah, sesi bervariasi per hari)` : '';
     setText('labelTotalHari', `Total Sesi Efektif (akumulasi real): ${res.totalSesiEfektif}${detailSesi} • Periode: ${tglMulai || 'semua'} s/d ${tglSelesai || 'semua'}`);
     if (!res.data || !res.data.length) {
-      tbody.innerHTML = '<tr><td colspan="12" style="text-align:center;">Tidak ada data.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="13" style="text-align:center;">Tidak ada data.</td></tr>';
       return;
     }
     tbody.innerHTML = res.data.map(s => {
@@ -5288,8 +5432,11 @@ function loadRekap() {
       const totalEfektif = Number(res.totalSesiEfektif) || Number(s.totalSesiEfektif) || 0;
       const denom = totalEfektif > 0 ? totalEfektif : (Number(s.totalSesiTercatat) || 0);
       const persen = hitungPersenHadir(nilaiHadir, denom);
+      const alpaN = Number(s.alpa) || 0;
+      const dis = alpaN <= 0 ? 'disabled' : '';
       return `
-      <tr>
+      <tr data-id="${s.id}" data-alpa="${alpaN}" data-persen="${persen}">
+        <td style="text-align:center;"><input type="checkbox" class="rekap-check" value="${s.id}" data-persen="${persen}" data-alpa="${alpaN}" ${dis} style="width:16px;height:16px;"></td>
         <td>${s.id}</td><td>${s.nama}</td><td>${s.unit}</td>
         <td>${s.tw}</td><td>${s.tl}</td><td>${s.izin}</td><td>${s.sakit}</td><td>${s.alpa}</td><td>${s.bolos}</td>
         <td><b>${s.totalSesiTercatat}</b></td><td><b>${Number(nilaiHadir).toFixed(2)}</b></td><td><b>${persen}%</b></td>
