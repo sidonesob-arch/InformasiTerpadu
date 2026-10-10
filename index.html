@@ -1254,6 +1254,18 @@ th { background: var(--primary-lighter); color: var(--primary); font-weight: bol
     <div id="menu-lihat-nilai-saya" class="section">
       <h3 style="color:var(--primary); font-size:15px; margin-top:0;">📊 Lihat Nilai Saya</h3>
       <div id="nilaiSayaPeriodeHint" class="download-summary" style="margin-bottom:10px;">📅 Periode: —</div>
+      <!-- Super Admin: cari siswa by NISN/Nama -->
+      <div id="nilaiSayaAdminSearch" style="display:none; background:#eef2ff; border:1px solid #a5b4fc; border-radius:10px; padding:12px 14px; margin-bottom:12px;">
+        <div style="font-size:12px;font-weight:800;color:#3730a3;margin-bottom:8px;">🔎 Super Admin — Cari Siswa (NISN / Nama)</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;">
+          <div class="form-group" style="margin:0;flex:1;min-width:180px;">
+            <label style="font-size:11px;">NISN atau Nama</label>
+            <input type="text" id="nilaiSayaSearchKw" placeholder="Contoh: 0012345678 / Budi" style="padding:8px 10px;font-size:13px;" onkeydown="if(event.key==='Enter'){event.preventDefault();cariSiswaNilaiSaya();}">
+          </div>
+          <button type="button" class="btn-primary" style="width:auto;padding:8px 16px;font-size:12px;" onclick="cariSiswaNilaiSaya()">Cari</button>
+        </div>
+        <div id="nilaiSayaSearchResult" style="margin-top:8px;font-size:12px;"></div>
+      </div>
       <div id="nilaiSayaLoginHint" style="background:#fff3cd; padding:14px; border-radius:8px; margin-bottom:14px; font-size:13px; border-left:4px solid #f59e0b;">
         Login sebagai <b>Siswa</b> terlebih dahulu (menu profil → Login Siswa) untuk melihat nilai Anda.
       </div>
@@ -1287,6 +1299,18 @@ th { background: var(--primary-lighter); color: var(--primary); font-weight: bol
 
     <div id="menu-cek-syarat" class="section">
       <h3 style="color:var(--primary); font-size:15px;">🎓 Cek Syarat Naik Kelas / Lulus</h3>
+      <!-- Super Admin: cari siswa by NISN/Nama -->
+      <div id="syaratAdminSearch" style="display:none; background:#eef2ff; border:1px solid #a5b4fc; border-radius:10px; padding:12px 14px; margin-bottom:12px;">
+        <div style="font-size:12px;font-weight:800;color:#3730a3;margin-bottom:8px;">🔎 Super Admin — Cari Siswa (NISN / Nama)</div>
+        <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:flex-end;">
+          <div class="form-group" style="margin:0;flex:1;min-width:180px;">
+            <label style="font-size:11px;">NISN atau Nama</label>
+            <input type="text" id="syaratSearchKw" placeholder="Contoh: 0012345678 / Budi" style="padding:8px 10px;font-size:13px;" onkeydown="if(event.key==='Enter'){event.preventDefault();cariSiswaSyarat();}">
+          </div>
+          <button type="button" class="btn-primary" style="width:auto;padding:8px 16px;font-size:12px;" onclick="cariSiswaSyarat()">Cari</button>
+        </div>
+        <div id="syaratSearchResult" style="margin-top:8px;font-size:12px;"></div>
+      </div>
       <div id="syaratBelumLogin" class="syarat-empty">
         <span class="icon">🔒</span>
         <h4 style="color:var(--primary); margin:0 0 8px;">Menu Terkunci</h4>
@@ -2579,6 +2603,8 @@ window.MENU_BY_ROLE = {
 
 let userData = null;
 let siswaUserData = null;
+/** Preview siswa untuk Super Admin (cari NISN/Nama) — tidak mengganti login siswa */
+let previewSiswaData = null;
 let cachedPinConfig = null;
 let dashboardTimer = null;
 let popupTimeout = null;
@@ -3748,6 +3774,9 @@ function applyRoleAccessUI() {
   setText('guruNamaDisplay', nama);
   setText('guruNamaDisplayDaftar', nama);
   try { updateSidebarVisibility(); } catch (e) {}
+  try { updateSuperAdminSiswaSearchUI(); } catch (e) {}
+  // Reset preview saat bukan super admin
+  if (!isSuperAdminRole()) previewSiswaData = null;
 }
 
 // ===================== NOTIFIKASI LOG LOGIN =====================
@@ -5452,17 +5481,131 @@ function exportRekapToExcel() {
   XLSX.writeFile(wb, "Rekap_Kehadiran.xlsx");
 }
 
+
+function isSuperAdminRole() {
+  return String(userRole || '').toLowerCase() === 'super_admin';
+}
+
+/** Siswa yang sedang dilihat: login siswa, atau preview Super Admin */
+function getSiswaContextForView() {
+  if (siswaUserData && siswaUserData.nisn) return siswaUserData;
+  if (isSuperAdminRole() && previewSiswaData && previewSiswaData.nisn) return previewSiswaData;
+  return null;
+}
+
+function updateSuperAdminSiswaSearchUI() {
+  const show = isSuperAdminRole();
+  const nBox = $('nilaiSayaAdminSearch');
+  const sBox = $('syaratAdminSearch');
+  if (nBox) nBox.style.display = show ? 'block' : 'none';
+  if (sBox) sBox.style.display = show ? 'block' : 'none';
+  // Sembunyikan hint login siswa bila super admin (mereka pakai pencarian)
+  if (show) {
+    const hint = $('nilaiSayaLoginHint');
+    if (hint && !(siswaUserData && siswaUserData.nisn)) {
+      hint.innerHTML = 'Sebagai <b>Super Admin</b>, cari siswa di kotak di atas (NISN / Nama) untuk melihat nilai.';
+      hint.style.display = 'block';
+    }
+  }
+}
+
+/**
+ * Cari siswa via get_data_siswa, tampilkan daftar pilihan.
+ * onPick(siswa) dipanggil saat baris dipilih.
+ */
+function cariSiswaByKeyword(keyword, resultElId, onPick) {
+  const kw = String(keyword || '').trim();
+  const box = $(resultElId);
+  if (!box) return;
+  if (kw.length < 2) {
+    box.innerHTML = '<span style="color:#b45309;">Masukkan minimal 2 karakter (NISN atau nama).</span>';
+    return;
+  }
+  box.innerHTML = '<span style="color:#64748b;">⏳ Mencari...</span>';
+  sendRequest({ action: 'get_data_siswa', search: kw, kelas: '' }, res => {
+    if (res.status !== 'success') {
+      box.innerHTML = '<span style="color:#b91c1c;">' + (res.message || 'Gagal mencari') + '</span>';
+      return;
+    }
+    let list = res.data || [];
+    // filter client-side juga (nisn/nama)
+    const k = kw.toLowerCase();
+    list = list.filter(s => {
+      const nisn = String(s.id || s.nisn || '').toLowerCase();
+      const nama = String(s.nama || '').toLowerCase();
+      return nisn.includes(k) || nama.includes(k);
+    }).slice(0, 15);
+    if (!list.length) {
+      box.innerHTML = '<span style="color:#64748b;">Tidak ditemukan siswa untuk "' + kw.replace(/</g,'') + '".</span>';
+      return;
+    }
+    box.innerHTML = list.map((s, i) => {
+      const nisn = String(s.id || s.nisn || '');
+      const nama = String(s.nama || '-');
+      const kelas = String(s.kelas || '-');
+      return `<button type="button" class="btn-sm" style="display:block;width:100%;text-align:left;margin:4px 0;padding:8px 10px;background:#fff;border:1px solid #c7d2fe;border-radius:8px;cursor:pointer;font-size:12px;"
+        data-idx="${i}"
+        onclick="(window.__saPickSiswa||[])[${i}] && window.__saPickSiswa[${i}]()">
+        <b style="color:var(--primary);">${nama.replace(/</g,'')}</b>
+        <span style="color:#64748b;"> · NISN ${nisn.replace(/</g,'')} · Kelas ${kelas.replace(/</g,'')}</span>
+      </button>`;
+    }).join('');
+    window.__saPickSiswa = list.map(s => () => {
+      const pick = {
+        nisn: String(s.id || s.nisn || ''),
+        nama: s.nama || '',
+        kelas: s.kelas || '',
+      };
+      if (typeof onPick === 'function') onPick(pick);
+    });
+  });
+}
+
+function cariSiswaNilaiSaya() {
+  if (!isSuperAdminRole()) return;
+  const kw = ($('nilaiSayaSearchKw') && $('nilaiSayaSearchKw').value) || '';
+  cariSiswaByKeyword(kw, 'nilaiSayaSearchResult', function (pick) {
+    previewSiswaData = pick;
+    const box = $('nilaiSayaSearchResult');
+    if (box) box.innerHTML = '<span style="color:#166534;font-weight:700;">✅ Memuat nilai: ' + (pick.nama || pick.nisn) + ' (NISN ' + pick.nisn + ')</span>';
+    loadNilaiSaya();
+  });
+}
+
+function cariSiswaSyarat() {
+  if (!isSuperAdminRole()) return;
+  const kw = ($('syaratSearchKw') && $('syaratSearchKw').value) || '';
+  cariSiswaByKeyword(kw, 'syaratSearchResult', function (pick) {
+    previewSiswaData = pick;
+    const box = $('syaratSearchResult');
+    if (box) box.innerHTML = '<span style="color:#166534;font-weight:700;">✅ Memuat syarat: ' + (pick.nama || pick.nisn) + ' (NISN ' + pick.nisn + ')</span>';
+    loadCekSyarat();
+  });
+}
+
+
 function updateSyaratAccessUI() {
   const belumLogin = $('syaratBelumLogin');
   const content = $('syaratContent');
   if (!belumLogin || !content) return;
-  if (siswaUserData && siswaUserData.nisn) {
+  const ctx = getSiswaContextForView();
+  if (ctx && ctx.nisn) {
     belumLogin.style.display = 'none';
     content.style.display = 'block';
+  } else if (isSuperAdminRole()) {
+    // Super admin: sembunyikan "menu terkunci", tampilkan area kosong + kotak cari
+    belumLogin.style.display = 'none';
+    content.style.display = 'block';
+    if ($('syaratResult') && !(previewSiswaData && previewSiswaData.nisn)) {
+      setHTML('syaratResult', `<div class="syarat-empty"><span class="icon">🔎</span>
+        <h4 style="color:var(--primary);margin:0 0 8px;">Cari Siswa</h4>
+        <p style="font-size:13px;">Masukkan NISN atau nama di kotak pencarian di atas, lalu pilih siswa.</p></div>`);
+    }
   } else {
     belumLogin.style.display = 'block';
     content.style.display = 'none';
   }
+  try { updateSuperAdminSiswaSearchUI(); } catch (e) {}
 }
 
 // ===================== LIHAT NILAI SAYA =====================
@@ -5548,19 +5691,26 @@ function loadNilaiSaya() {
     const sem = p.semester === 'genap' ? 'Genap' : (p.semester === 'ganjil' ? 'Ganjil' : '—');
     pHint.textContent = '📅 Periode aktif: ' + ta + ' || ' + sem + ' (data nilai tidak tercampur antar semester)';
   }
-  if (!siswaUserData || !siswaUserData.nisn) {
-    if (hint) hint.style.display = 'block';
+  try { updateSuperAdminSiswaSearchUI(); } catch (e) {}
+  const ctxNilai = getSiswaContextForView();
+  if (!ctxNilai || !ctxNilai.nisn) {
+    if (hint) {
+      if (isSuperAdminRole()) {
+        hint.innerHTML = 'Sebagai <b>Super Admin</b>, cari siswa di kotak di atas (NISN / Nama) untuk melihat nilai.';
+      }
+      hint.style.display = 'block';
+    }
     if (content) content.style.display = 'none';
     return;
   }
   if (hint) hint.style.display = 'none';
   if (content) content.style.display = 'block';
-  setText('nilaiSayaHeaderNama', siswaUserData.nama || 'Siswa');
-  setText('nilaiSayaHeaderMeta', 'NISN: ' + (siswaUserData.nisn || '-') + ' · Kelas: ' + (siswaUserData.kelas || '-'));
+  setText('nilaiSayaHeaderNama', ctxNilai.nama || 'Siswa');
+  setText('nilaiSayaHeaderMeta', 'NISN: ' + (ctxNilai.nisn || '-') + ' · Kelas: ' + (ctxNilai.kelas || '-') + (isSuperAdminRole() && !(siswaUserData && siswaUserData.nisn) ? ' · (preview Super Admin)' : ''));
   const thead = $('tableNilaiSayaHead');
   const tbody = $('tableNilaiSayaBody');
   if (tbody) tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; color:#666;">⏳ Memuat nilai...</td></tr>';
-  sendRequest({ action: 'get_nilai_siswa', nisn: siswaUserData.nisn, ...(typeof getPeriodePayload==='function'?getPeriodePayload():{}) }, res => {
+  sendRequest({ action: 'get_nilai_siswa', nisn: (getSiswaContextForView()||{}).nisn, ...(typeof getPeriodePayload==='function'?getPeriodePayload():{}) }, res => {
     if (!tbody) return;
     if (res.status !== 'success') {
       tbody.innerHTML = `<tr><td colspan="8" style="text-align:center; color:#b91c1c;">${res.message || 'Gagal memuat nilai'}</td></tr>`;
@@ -5677,12 +5827,13 @@ function loadNilaiSaya() {
 
 function loadCekSyarat() {
   updateSyaratAccessUI();
-  if (!siswaUserData || !siswaUserData.nisn) return;
+  const ctxSyarat = getSiswaContextForView();
+  if (!ctxSyarat || !ctxSyarat.nisn) return;
   const content = $('syaratContent');
   content.style.display = 'block';
   showEl('syaratLoading');
   setHTML('syaratResult', '');
-  sendRequest({ action: 'get_syarat_kelulusan', nisn: siswaUserData.nisn }, res => {
+  sendRequest({ action: 'get_syarat_kelulusan', nisn: ctxSyarat.nisn }, res => {
     hideEl('syaratLoading');
     if (res.status === 'not_configured') {
       setHTML('syaratResult', `<div class="syarat-empty"><span class="icon">⚙️</span><h4>Belum Dikonfigurasi</h4><p>${res.message}</p></div>`);
