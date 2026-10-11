@@ -1390,7 +1390,7 @@ th { background: var(--primary-lighter); color: var(--primary); font-weight: bol
       </div>
 
       <!-- Bulk ubah status A → TW/TL -->
-      <div id="rekapBulkABox" style="background:#fff7ed;border:1px solid #fdba74;border-radius:10px;padding:12px 14px;margin:10px 0 12px;">
+      <div id="rekapBulkABox" style="display:none;background:#fff7ed;border:1px solid #fdba74;border-radius:10px;padding:12px 14px;margin:10px 0 12px;">
         <div style="font-size:12px;font-weight:800;color:#9a3412;margin-bottom:6px;">⚡ Ubah status Alpa (A) massal → TW / TL</div>
         <p style="font-size:11px;color:#9a3412;margin:0 0 10px;line-height:1.45;">
           Hanya <b>mengubah status</b> baris Alpa yang sudah ada.
@@ -1750,6 +1750,42 @@ th { background: var(--primary-lighter); color: var(--primary); font-weight: bol
             <button class="btn-success btn-sm" style="width:auto; padding:6px 14px;" onclick="resetPinSelected()">✅ Reset Terpilih</button>
           </div>
           <div class="reset-user-list" id="resetPinList"><div style="text-align:center; padding:20px;">Memuat data...</div></div>
+        </div>
+
+        <!-- Ubah PIN Admin & Super Admin (hanya Super Admin) -->
+        <div id="resetPinAdminBox" style="display:none;background:#f5f3ff;border:1px solid #c4b5fd;border-radius:10px;padding:12px;margin-top:14px;">
+          <div style="font-size:12px;font-weight:700;color:#5b21b6;margin-bottom:6px;">🛡️ Ubah PIN Admin &amp; Super Admin</div>
+          <p style="font-size:11px;color:#6b21a8;margin:0 0 10px;line-height:1.45;">
+            Hanya <b>Super Admin</b> yang dapat mengubah PIN ini.
+            PIN Admin dipakai login role <b>admin</b>; PIN Super Admin dipakai login role <b>super_admin</b> (menu pengaturan penuh).
+          </p>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div style="background:#fff;border:1px solid #ddd6fe;border-radius:8px;padding:10px;">
+              <div style="font-size:12px;font-weight:700;color:var(--primary);margin-bottom:8px;">PIN Admin</div>
+              <div class="form-group" style="margin-bottom:8px;">
+                <label style="font-size:11px;">PIN baru</label>
+                <input type="password" id="pinAdminBaru" placeholder="Min. 4 digit" inputmode="numeric" autocomplete="new-password">
+              </div>
+              <div class="form-group" style="margin-bottom:8px;">
+                <label style="font-size:11px;">Ulangi PIN</label>
+                <input type="password" id="pinAdminBaru2" placeholder="Ulangi PIN" inputmode="numeric" autocomplete="new-password">
+              </div>
+              <button type="button" class="btn-primary btn-sm" style="width:auto;padding:6px 14px;" onclick="simpanPinAdminRole('admin')">💾 Simpan PIN Admin</button>
+            </div>
+            <div style="background:#fff;border:1px solid #fde68a;border-radius:8px;padding:10px;">
+              <div style="font-size:12px;font-weight:700;color:#b45309;margin-bottom:8px;">PIN Super Admin</div>
+              <div class="form-group" style="margin-bottom:8px;">
+                <label style="font-size:11px;">PIN baru</label>
+                <input type="password" id="pinSuperBaru" placeholder="Min. 4 digit" inputmode="numeric" autocomplete="new-password">
+              </div>
+              <div class="form-group" style="margin-bottom:8px;">
+                <label style="font-size:11px;">Ulangi PIN</label>
+                <input type="password" id="pinSuperBaru2" placeholder="Ulangi PIN" inputmode="numeric" autocomplete="new-password">
+              </div>
+              <button type="button" class="btn-primary btn-sm" style="width:auto;padding:6px 14px;background:#b45309;" onclick="simpanPinAdminRole('super_admin')">💾 Simpan PIN Super Admin</button>
+            </div>
+          </div>
+          <div id="pinAdminStatusHint" style="font-size:11px;color:#64748b;margin-top:10px;"></div>
         </div>
       </div>
 
@@ -3775,6 +3811,20 @@ function applyRoleAccessUI() {
   setText('guruNamaDisplayDaftar', nama);
   try { updateSidebarVisibility(); } catch (e) {}
   try { updateSuperAdminSiswaSearchUI(); } catch (e) {}
+  // Ubah Status Alpa (bulk) hanya Super Admin
+  try {
+    const bulkBox = $('rekapBulkABox');
+    if (bulkBox) bulkBox.style.display = isSuperAdminRole() ? 'block' : 'none';
+    const thCheck = document.querySelector('#tableRekap thead th');
+    if (thCheck && thCheck.textContent.trim() === '✓') {
+      thCheck.style.display = isSuperAdminRole() ? '' : 'none';
+    }
+  } catch (e) {}
+  // Form PIN Admin / Super Admin di panel reset
+  try {
+    const pinAdminBox = $('resetPinAdminBox');
+    if (pinAdminBox) pinAdminBox.style.display = isSuperAdminRole() ? 'block' : 'none';
+  } catch (e) {}
   // Reset preview saat bukan super admin
   if (!isSuperAdminRole()) previewSiswaData = null;
 }
@@ -5348,6 +5398,7 @@ function getRekapBulkPayload(ids, mode) {
   const pct = persenSel ? Number(persenSel) : null;
   return {
     action: 'bulk_ubah_status_a',
+    actor_role: (typeof userRole !== 'undefined' ? userRole : '') || '',
     role: ($('rekapRole') && $('rekapRole').value) || 'siswa',
     kelas: ($('rekapKelas') && $('rekapKelas').value) || '',
     tglMulai: ($('rekapTglMulai') && $('rekapTglMulai').value) || '',
@@ -5375,6 +5426,9 @@ function _fmtBulkDetail(res) {
 }
 
 function bulkUbahStatusATerpilih() {
+  if (!isSuperAdminRole()) {
+    return showBigPopup('warning', 'Akses Ditolak', 'Fitur Ubah Status Alpa hanya untuk Super Admin.');
+  }
   const persenMax = ($('rekapBulkPersen') && $('rekapBulkPersen').value) ? Number($('rekapBulkPersen').value) : null;
   const target = ($('rekapBulkTargetStatus') && $('rekapBulkTargetStatus').value) || 'TW';
   let checks = Array.from(document.querySelectorAll('.rekap-check:checked:not(:disabled)'));
@@ -5398,6 +5452,9 @@ function bulkUbahStatusATerpilih() {
 }
 
 function bulkUbahStatusAByPersen() {
+  if (!isSuperAdminRole()) {
+    return showBigPopup('warning', 'Akses Ditolak', 'Fitur Ubah Status Alpa hanya untuk Super Admin.');
+  }
   const persenSel = ($('rekapBulkPersen') && $('rekapBulkPersen').value) || '';
   if (!persenSel) return showBigPopup('warning', 'Peringatan', 'Pilih filter persen dulu (70%–100%).');
   const target = ($('rekapBulkTargetStatus') && $('rekapBulkTargetStatus').value) || 'TW';
@@ -5411,6 +5468,9 @@ function bulkUbahStatusAByPersen() {
 }
 
 function bulkUbahStatusAUntilTarget() {
+  if (!isSuperAdminRole()) {
+    return showBigPopup('warning', 'Akses Ditolak', 'Fitur Ubah Status Alpa hanya untuk Super Admin.');
+  }
   const persenSel = ($('rekapBulkPersen') && $('rekapBulkPersen').value) || '';
   if (!persenSel) return showBigPopup('warning', 'Peringatan', 'Pilih target persen dulu (70%–100%).');
   const target = ($('rekapBulkTargetStatus') && $('rekapBulkTargetStatus').value) || 'TW';
@@ -5455,6 +5515,13 @@ function loadRekap() {
       tbody.innerHTML = '<tr><td colspan="13" style="text-align:center;">Tidak ada data.</td></tr>';
       return;
     }
+    const canBulkA = typeof isSuperAdminRole === 'function' && isSuperAdminRole();
+    try {
+      const thCheck = document.querySelector('#tableRekap thead th');
+      if (thCheck && thCheck.textContent.trim() === '✓') {
+        thCheck.style.display = canBulkA ? '' : 'none';
+      }
+    } catch (e) {}
     tbody.innerHTML = res.data.map(s => {
       // TW=1, TL=0.8 (override bobot lama TL=1 dari server bila ada)
       const nilaiHadir = hitungNilaiHadirDariStatus(s.tw, s.tl, s.sakit, s.izin);
@@ -5463,9 +5530,12 @@ function loadRekap() {
       const persen = hitungPersenHadir(nilaiHadir, denom);
       const alpaN = Number(s.alpa) || 0;
       const dis = alpaN <= 0 ? 'disabled' : '';
+      const tdCheck = canBulkA
+        ? `<td style="text-align:center;"><input type="checkbox" class="rekap-check" value="${s.id}" data-persen="${persen}" data-alpa="${alpaN}" ${dis} style="width:16px;height:16px;"></td>`
+        : '';
       return `
       <tr data-id="${s.id}" data-alpa="${alpaN}" data-persen="${persen}">
-        <td style="text-align:center;"><input type="checkbox" class="rekap-check" value="${s.id}" data-persen="${persen}" data-alpa="${alpaN}" ${dis} style="width:16px;height:16px;"></td>
+        ${tdCheck}
         <td>${s.id}</td><td>${s.nama}</td><td>${s.unit}</td>
         <td>${s.tw}</td><td>${s.tl}</td><td>${s.izin}</td><td>${s.sakit}</td><td>${s.alpa}</td><td>${s.bolos}</td>
         <td><b>${s.totalSesiTercatat}</b></td><td><b>${Number(nilaiHadir).toFixed(2)}</b></td><td><b>${persen}%</b></td>
@@ -6133,6 +6203,11 @@ function togglePengaturanPanel(tab) {
   if (tab === 'reset-pin-sidik' || tab === 'reset-fingerprint' || tab === 'reset-pin') {
     try { loadResetFingerprintList(); } catch (e) {}
     try { loadResetPinList(); } catch (e) {}
+    try {
+      const pinAdminBox = $('resetPinAdminBox');
+      if (pinAdminBox) pinAdminBox.style.display = isSuperAdminRole() ? 'block' : 'none';
+      if (typeof loadStatusPinAdmin === 'function') loadStatusPinAdmin();
+    } catch (e) {}
   }
   if (tab === 'pin-guru') loadPinGuruList();
   if (tab === 'sesi' || tab === 'seting-absen') {
@@ -6873,6 +6948,54 @@ function simpanPinGuru(userId) {
   if (!pin) return showBigPopup('warning', 'Peringatan', 'PIN tidak boleh kosong!');
   sendRequest({ action: 'save_guru_pin', userId, pin }, res => {
     showBigPopup(res.status === 'success' ? 'success' : 'danger', 'PIN', res.message);
+  });
+}
+
+/** Ubah PIN Admin atau Super Admin (hanya Super Admin) */
+function simpanPinAdminRole(jenis) {
+  if (!isSuperAdminRole()) {
+    return showBigPopup('warning', 'Akses Ditolak', 'Hanya Super Admin yang dapat mengubah PIN Admin / Super Admin.');
+  }
+  const isSuper = String(jenis || '').toLowerCase() === 'super_admin';
+  const pinEl = $(isSuper ? 'pinSuperBaru' : 'pinAdminBaru');
+  const pin2El = $(isSuper ? 'pinSuperBaru2' : 'pinAdminBaru2');
+  const pin = (pinEl && pinEl.value || '').trim();
+  const pin2 = (pin2El && pin2El.value || '').trim();
+  if (!pin || pin.length < 4) {
+    return showBigPopup('warning', 'Peringatan', 'PIN minimal 4 karakter.');
+  }
+  if (pin !== pin2) {
+    return showBigPopup('warning', 'Peringatan', 'PIN dan ulangan tidak sama.');
+  }
+  if (!confirm('Yakin mengubah PIN ' + (isSuper ? 'Super Admin' : 'Admin') + '?\n\nPIN lama tidak bisa dipakai lagi setelah disimpan.')) return;
+  sendRequest({
+    action: 'save_admin_pin',
+    jenis: isSuper ? 'super_admin' : 'admin',
+    pin: pin,
+    actor_role: userRole || '',
+  }, res => {
+    showBigPopup(res.status === 'success' ? 'success' : 'danger', 'PIN', res.message || 'Selesai');
+    if (res.status === 'success') {
+      if (pinEl) pinEl.value = '';
+      if (pin2El) pin2El.value = '';
+      const hint = $('pinAdminStatusHint');
+      if (hint) {
+        hint.textContent = '✓ PIN ' + (isSuper ? 'Super Admin' : 'Admin') + ' berhasil diperbarui · ' + new Date().toLocaleTimeString('id-ID');
+        hint.style.color = '#166534';
+      }
+    }
+  });
+}
+
+function loadStatusPinAdmin() {
+  if (!isSuperAdminRole()) return;
+  sendRequest({ action: 'get_admin_pin_status', actor_role: userRole || '' }, res => {
+    const hint = $('pinAdminStatusHint');
+    if (!hint || res.status !== 'success') return;
+    const a = res.admin_set ? 'terisi' : 'belum diset (default)';
+    const s = res.super_set ? 'terisi' : 'belum diset (default)';
+    hint.textContent = 'Status: PIN Admin ' + a + ' · PIN Super Admin ' + s;
+    hint.style.color = '#64748b';
   });
 }
 
